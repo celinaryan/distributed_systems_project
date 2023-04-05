@@ -80,7 +80,7 @@ class SpoonsClient:
         self.get_cards()
 
         while(True):
-            print('YOUR HAND:')
+            print('\nYOUR HAND:')
             self.display_cards(self.mycards)
 
             method = input("Enter 'p' to pickup next card\n")
@@ -177,4 +177,4 @@ class SpoonsClient:
             elif card[1] == 'S':
                 suit = "\u2660"
 
-            print(f'+-----+\n|{card[0]}    |\n|{suit}    |\n|     |\n+-----+')
+            print(f'\t+-----+\n\t|{card[0]}    |\n\t|{suit}    |\n\t|     |\n\t+-----+')
