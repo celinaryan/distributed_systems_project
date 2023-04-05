@@ -154,13 +154,18 @@ class SpoonsServer:
             self.players_info[player]['cards'].append(new_card)
             resp = { 'result': 'success', 'card': new_card }
 
-        ### LEFT OFF HERE
-        #elif method == 'discard':
-            # push(card) onto the pick up deck of the next player
-            # in case they are last player, add to discard pile
-            # resp =
-        #else:
-            # resp = 
+        elif method == 'discard':
+            self.players_info[player]['cards'].remove(msg['card'])
+            next_ind = self.players_info[player]['player_num'] + 1
+
+            # if last player, go to discard pile
+            if next_ind == self.num_players:
+                self.discard_pile.append(msg['card'])
+            # else into next player's pickup deck
+            else:
+                self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
+
+            resp = { 'result': 'success' }
 
         return resp
 

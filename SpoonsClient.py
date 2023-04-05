@@ -115,8 +115,21 @@ class SpoonsClient:
             self.discard(discard_card)
             self.mycards.remove(discard_card)
             
+            if self.four_of_a_kind():
+                self.grab_spoon()
+
             # if resp is 'eliminated':
             #   break
+
+    def grab_spoon(self):
+        input("PRESS ENTER TO GRAB SPOON!")
+        msg = { 'method': 'grab_spoon' }
+        msg = json.dumps(msg)
+        self.send_request(msg)
+        resp = self.recv_resp(msg)
+        ## print whether eliminated or moving on
+        ##return resp
+
 
     def get_cards(self):
         msg = { 'method': 'get_cards' }
@@ -190,6 +203,11 @@ class SpoonsClient:
                 break
 
         return resp
+
+    def four_of_a_kind(self):
+        if self.mycards[0][:-1] == self.mycards[1][:-1] == self.mycards[2][:-1] == self.mycards[3][:-1]:
+            return 1
+
 
     def display_cards(self, cards, graphics):
         for card in cards:
