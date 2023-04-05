@@ -124,7 +124,8 @@ class SpoonsServer:
         self.players_info[player] = {
                                         'cards': [],
                                         'pickup_deck': [],
-                                        'player_num': self.num_players
+                                        'player_num': self.num_players,
+                                        'spoon_grabbed': 0
                                     }
 
     def execute_msg(self, player, msg):
