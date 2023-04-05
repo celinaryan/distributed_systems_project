@@ -56,16 +56,15 @@ class SpoonsServer:
             # if self.num_players == 0:
             #     continue
 
+            print('Starting game!')
             self.play_game()
 
         
     def play_game(self):
         self.deal_cards()
 
-        print(self.players_info)
-        print(self.deck.remaining_cards)
-
-        # TODO: set pickup pile of player #0 to be remaining_cards in deck object
+        # Set pickup pile of player #0 to be remaining_cards in deck object
+        self.players_info[self.players[0]]['pickupdeck'] = self.deck.remaining_cards
     
         while self.game_over == 0:
             if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
@@ -87,21 +86,23 @@ class SpoonsServer:
 
             #### ??? right now i have this using chunking like if client sends length of msg, not sure if we wanted this so we can def take out
             try: 
-                bytes_to_read = client.recv(2).decode()
+                bytes_to_read = player.recv(2).decode()
             except ConnectionResetError as cre:
                 break
 
             if bytes_to_read == '':
-                self.clients.remove(client)
-                client.close()
+                self.players.remove(player)
+                del self.players_info[player]
+                player.close()
                 continue
 
-            msg = client.recv(int(bytes_to_read)).decode()
+            msg = player.recv(int(bytes_to_read)).decode()
             bytes_read = len(msg)
 
             if bytes_read == 0:
-                self.clients.remove(client)
-                client.close()
+                self.players.remove(player)
+                del self.players_info[player]
+                player.close()
                 continue
 
             if(msg == -1):
@@ -109,11 +110,11 @@ class SpoonsServer:
                 continue
 
             while int(bytes_read) < int(bytes_to_read):
-                msg += client.recv(int(bytes_to_read) - bytes_read).decode()
+                msg += player.recv(int(bytes_to_read) - bytes_read).decode()
 
-            response = self.execute_msg(msg)
+            response = self.execute_msg(player, msg)
             response = json.dumps(response)
-            client.send(response.encode())
+            player.send(response.encode())
             
         return
 
@@ -125,12 +126,23 @@ class SpoonsServer:
                                         'player_num': self.num_players
                                     }
 
-    def execute_msg(self, msg):
+    def execute_msg(self, player, msg):
         msg = json.loads(msg)
-
         method = msg['method']
-        # TODO: handle pickup, putdown, and spoon requests from clients
-        # if method == 'pick_up':
+
+        # TODO: handle get_cards, pickup, putdown, and spoon requests from clients
+        if method == 'get_cards':
+            resp = { 'result': 'success', 'cards': self.players_info[player]['cards'] }
+
+        #elif method == 'pickup':
+            # resp =
+        #elif method == 'discard':
+            # resp =
+        #else:
+            # resp = 
+
+        return resp
+
 
 
     def deal_cards(self):
@@ -157,6 +169,7 @@ class SpoonsServer:
 if __name__ == '__main__':
     if len(sys.argv) != 3:
         print('Invalid number of arguments')
+        print('Usage: python3 SpoonsServer.py <GAME_NAME> <NUM_PLAYERS>')
         exit(1)
     else:
         game_name = sys.argv[1]
