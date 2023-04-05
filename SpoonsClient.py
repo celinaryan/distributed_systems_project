@@ -5,6 +5,11 @@ import http.client
 import time
 
 class SpoonsClient:
+    heart = "\u2665"
+    club = "\u2663"
+    diamond = "\u2666"
+    spade = "\u2660"
+
     def __init__(self, game_name):
         self.game_name = game_name
         self.host = None
@@ -81,17 +86,35 @@ class SpoonsClient:
 
         while(True):
             print('\nYOUR HAND:')
-            self.display_cards(self.mycards)
+            self.display_cards(self.mycards, 1)
 
             method = input("Enter 'p' to pickup next card\n")
             if method != 'p':
                 print('Invalid operation')
                 continue
 
-            #new_card = self.pickup()
-            #display_cards(new_card)
+            new_card = self.pickup()
+            if new_card == None:
+                print('No cards in pick up deck yet. Try again.')
+                continue
+            
+            self.mycards.append(new_card)
+            print('NEW CARD:')
+            self.display_cards([new_card], 1)
 
+            for i, card in enumerate(self.mycards):
+                print(str(i) + ': ', end='')
+                self.display_cards([card], 0)
+            ind = int(input("\tEnter card to discard (0-4): "))
 
+            while ind < 0 or ind > 4:
+                print('\tInvalid card selected.')
+                ind = int(input("\tEnter card to discard (0-4)"))
+
+            discard_card = self.mycards[ind]
+            self.discard(discard_card)
+            self.mycards.remove(discard_card)
+            
             # if resp is 'eliminated':
             #   break
 
@@ -108,7 +131,10 @@ class SpoonsClient:
         msg = json.dumps(msg)
         self.send_request(msg)
         resp = self.recv_resp(msg)
-        return resp['card']
+        if resp['result'] == 'success':
+            return resp['card']
+        else:
+            return None
 
     def discard(self, card):
         msg = { 'method': 'discard', 'card': card}
@@ -165,16 +191,22 @@ class SpoonsClient:
 
         return resp
 
-    def display_cards(self, cards):
-
+    def display_cards(self, cards, graphics):
         for card in cards:
-            if card[1] == 'H':
-                suit = "\u2665"
-            elif card[1] == 'C':
-                suit = "\u2663"
-            elif card[1] == 'D':
-                suit = "\u2666"
-            elif card[1] == 'S':
-                suit = "\u2660"
+            if card[-1:] == 'H':
+                suit = self.heart
+            elif card[-1:] == 'C':
+                suit = self.club
+            elif card[-1:] == 'D':
+                suit = self.diamond
+            elif card[-1:] == 'S':
+                suit = self.spade
 
-            print(f'\t+-----+\n\t|{card[0]}    |\n\t|{suit}    |\n\t|     |\n\t+-----+')
+            if graphics:
+                # adjust for different spacing with 10 (two digit number)
+                if card[:-1] == '10':
+                    print(f'\t+-----+\n\t|{card[:-1]}   |\n\t|{suit}    |\n\t|     |\n\t+-----+')
+                else:
+                    print(f'\t+-----+\n\t|{card[:-1]}    |\n\t|{suit}    |\n\t|     |\n\t+-----+')
+            else:
+                print(f'{card[:-1]}{suit}')

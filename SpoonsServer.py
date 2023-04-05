@@ -20,6 +20,7 @@ class SpoonsServer:
         self.num_players = 0
         self.num_spoons = 0
         self.deck = CardDeck()
+        self.discard_pile = []
         # ??? self.spoon_port = 
 
         self.master.bind((socket.gethostname(), self.port))
@@ -64,7 +65,7 @@ class SpoonsServer:
         self.deal_cards()
 
         # Set pickup pile of player #0 to be remaining_cards in deck object
-        self.players_info[self.players[0]]['pickupdeck'] = self.deck.remaining_cards
+        self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
     
         while self.game_over == 0:
             if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
@@ -122,7 +123,7 @@ class SpoonsServer:
     def init_player_info(self, player):
         self.players_info[player] = {
                                         'cards': [],
-                                        'pickupdeck': [],
+                                        'pickup_deck': [],
                                         'player_num': self.num_players
                                     }
 
@@ -134,9 +135,29 @@ class SpoonsServer:
         if method == 'get_cards':
             resp = { 'result': 'success', 'cards': self.players_info[player]['cards'] }
 
-        #elif method == 'pickup':
-            # resp =
+        elif method == 'pickup':
+            if len(self.players_info[player]['pickup_deck']) == 0:
+
+                if player == self.players[0]:
+                    if self.discard_pile == []:
+                        resp = { 'result': 'failure', 'message': 'No cards in pickup deck. Try again.' }
+                        return resp
+                    else:
+                        self.players_info[player]['pickup_deck'] = self.discard_pile
+                        self.discard_pile = []
+
+                else:
+                    resp = { 'result': 'failure', 'message': 'No cards in pickup deck. Try again.' }
+                    return resp
+
+            new_card = self.players_info[player]['pickup_deck'].pop()
+            self.players_info[player]['cards'].append(new_card)
+            resp = { 'result': 'success', 'card': new_card }
+
+        ### LEFT OFF HERE
         #elif method == 'discard':
+            # push(card) onto the pick up deck of the next player
+            # in case they are last player, add to discard pile
             # resp =
         #else:
             # resp = 
