@@ -4,8 +4,8 @@ import json
 import http.client
 
 class SpoonsClient:
-    def __init__(self, game):
-        self.game = game
+    def __init__(self, game_name):
+        self.game_name = game_name
         self.host = None
         self.port = 0
         self.lastheardfrom = 0
@@ -14,6 +14,7 @@ class SpoonsClient:
         
         # lookup name and connect to server
         self.connect_to_server()
+        #self.play_game()
 
     def find_name(self):
         self.name_retries = 0
@@ -24,12 +25,12 @@ class SpoonsClient:
 
             for entry in name_server_entries:
                 try:
-                    if self.host == None and entry['project'] == self.project: # save the first match
+                    if self.host == None and entry['game_name'] == self.game_name: # save the first match
                         self.host = entry['name']
                         self.port = entry['port']
                         self.lastheardfrom = entry['lastheardfrom']
 
-                    elif entry['project'] == self.project:   # if exist more matches --> check lastheardfrom
+                    elif entry['game_name'] == self.game_name:   # if exist more matches --> check lastheardfrom
                         if entry['lastheardfrom'] > self.lastheardfrom:
                             self.host = entry['name']
                             self.port = entry['port']
@@ -46,7 +47,7 @@ class SpoonsClient:
             else:
                 break
 
-    def connect_to_server():
+    def connect_to_server(self):
         # find in name server and connect
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.settimeout(5)
@@ -70,9 +71,8 @@ class SpoonsClient:
                 time.sleep(2**self.server_retries)
                 self.server_retries+=1
 
-        # prompt user to tell when ready?
-        
+    #def play_game(self):
 
-        # when ready, call join_game()
+
 
 

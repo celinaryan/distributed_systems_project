@@ -19,7 +19,7 @@ class CardDeck:
 
         hands = []
         ind = 0
-        print('num', num)
+
         for i in range(num):
             hands.append(self.cards[ind:ind+4])
             ind += 4
