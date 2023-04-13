@@ -59,7 +59,7 @@ class SpoonsClient:
     def connect_to_server(self):
         # find in name server and connect
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.settimeout(5)
+        self.s.settimeout(30)
         self.find_name()
 
         self.server_retries = 0
