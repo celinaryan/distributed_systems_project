@@ -66,10 +66,11 @@ class SpoonsClient:
         while(True):
             try:
                 res = self.s.connect((self.host, self.port))
-                print('Connected')
+                print('Connected to port: ', self.port)
                 break
             except Exception as e:
                 print('Connection to server failed. Restarting connection.')
+                print("tried port: ", self.port)
                 try:
                     self.s.close()
                 except:
