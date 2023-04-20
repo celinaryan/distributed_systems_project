@@ -10,7 +10,7 @@ class SpoonsServer:
     def __init__(self, game_name, expected_players):
         self.master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.name_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.port = 0
+        self.port = 9000
         self.game_name = game_name
         self.last_sent = 0
 
