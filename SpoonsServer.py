@@ -190,6 +190,8 @@ class SpoonsServer:
             msg = { "type" : "hashtable", "owner" : "mnovak5", "port" : self.port, "game_name" : self.game_name }
             result = name_server.sendto(json.dumps(msg).encode(), (socket.gethostbyname('catalog.cse.nd.edu'), 9097))
 
+        print('port:', self.port)
+
         name_server.close()
 
 
