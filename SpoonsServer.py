@@ -23,7 +23,14 @@ class SpoonsServer:
         self.discard_pile = []
         # ??? self.spoon_port = 
 
-        self.master.bind((socket.gethostname(), self.port))
+        # for port already used error
+        for i in range(1,15):
+            try:
+                self.master.bind((socket.gethostname(), self.port))
+                break
+            except:
+                self.port += 1
+        
         if(self.master.listen(5) == -1):
             print('Failed to listen on port ' + str(self.master.getsockname()[1]))
 

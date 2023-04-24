@@ -36,6 +36,8 @@ class SpoonsClient:
                 try:
                     if self.host == None and entry['game_name'] == self.game_name: # save the first match
                         self.host = entry['name']
+                        print('host:', entry['name'])
+                        print('owner:', entry['owner'])
                         self.port = entry['port']
                         self.lastheardfrom = entry['lastheardfrom']
 
@@ -211,8 +213,8 @@ class SpoonsClient:
 
 
     def display_cards(self, cards, graphics):
-        suits = []
-        tens = [] # array of booleans saying if its a ten or not
+        suits = [0,0,0,0]
+        tens = [0,0,0,0] # array of booleans saying if its a ten or not
 
         for index, card in enumerate(cards):
             if card[-1:] == 'H':
@@ -230,25 +232,47 @@ class SpoonsClient:
 
         if graphics:
             # adjust for different spacing with 10 (two digit number)
-            print(f'\t+-----+\t\t+-----+\t\t+-----+\t\t+-----+\t\t\n')
+            print(f'\t+-----+\t\t+-----+\t\t+-----+\t\t+-----+\t\t')
             if tens[0]==1:
-                print(f'\t|{cards[0][:-1]}   |\t')
+                print(f'\t|{cards[0][:-1]}   |\t', end='')
             else:
-                print(f'\t|{cards[0][:-1]}    |\t')
+                print(f'\t|{cards[0][:-1]}    |\t', end='')
             if tens[1]==1:
-                print(f'\t|{cards[1][:-1]}   |\t')
+                print(f'\t|{cards[1][:-1]}   |\t', end='')
             else:
-                print(f'\t|{cards[1][:-1]}    |\t')
+                print(f'\t|{cards[1][:-1]}    |\t', end='')
             if tens[2]==1:
-                print(f'\t|{cards[2][:-1]}   |\t')
+                print(f'\t|{cards[2][:-1]}   |\t', end='')
             else:
-                print(f'\t|{cards[2][:-1]}    |\t')
+                print(f'\t|{cards[2][:-1]}    |\t', end='')
             if tens[3]==1:
-                print(f'\t|{cards[3][:-1]}   |\t\t\n')
+                print(f'\t|{cards[3][:-1]}   |\t\t')
             else:
-                print(f'\t|{cards[3][:-1]}    |\t\t\n')
-            print(f'\t|{suits[0]}    |\t\t|{suits[1]}    |\t\t|{suits[2]}    |\t\t|{suits[3]}    |\t\t\n')
-            print(f'\t|     |\t\t|     |\t\t|     |\t\t|     |\t\t\n')
-            print(f'\t+-----+\t\t+-----+\t\t+-----+\t\t+-----+\t\t\n')
+                print(f'\t|{cards[3][:-1]}    |\t\t')
+            print(f'\t|{suits[0]}    |\t\t|{suits[1]}    |\t\t|{suits[2]}    |\t\t|{suits[3]}    |\t\t')
+            print(f'\t|     |\t\t|     |\t\t|     |\t\t|     |\t\t')
+            print(f'\t+-----+\t\t+-----+\t\t+-----+\t\t+-----+\t\t')
         else:
             print(f'{card[:-1]}{suit}')
+
+
+
+
+        # for card in cards:
+        #     if card[-1:] == 'H':
+        #         suit = self.heart
+        #     elif card[-1:] == 'C':
+        #         suit = self.club
+        #     elif card[-1:] == 'D':
+        #         suit = self.diamond
+        #     elif card[-1:] == 'S':
+        #         suit = self.spade
+
+        #     if graphics:
+        #         # adjust for different spacing with 10 (two digit number)
+        #         if card[:-1] == '10':
+        #             print(f'\t+-----+\n\t|{card[:-1]}   |\n\t|{suit}    |\n\t|     |\n\t+-----+')
+        #         else:
+        #             print(f'\t+-----+\n\t|{card[:-1]}    |\n\t|{suit}    |\n\t|     |\n\t+-----+')
+        #     else:
+        #         print(f'{card[:-1]}{suit}')
