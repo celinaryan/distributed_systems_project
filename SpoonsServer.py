@@ -44,7 +44,7 @@ class SpoonsServer:
 
         # will continue playing games until server is killed
         while True:
-            # ask megan, is this a timeout for players to join??
+            # ask meghan, is this a timeout for players to join??
             if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
                 self.send_udp()
                 self.last_sent = time.time_ns()

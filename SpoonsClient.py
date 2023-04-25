@@ -132,7 +132,7 @@ class SpoonsClient:
         if wantSpoon == 'X\n':
             if self.four_of_a_kind():
                 currTime = time.time_ns()
-                # check if im doing the messages right, just doing it based off of the code I saw megan right
+                # check if im doing the messages right, just doing it based off of the code I saw meghan right
                 msg = { 'method': 'grab_spoon', 'time': str(currTime)}
                 msg = json.dumps(msg)
                 self.send_request(msg)
