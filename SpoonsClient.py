@@ -118,20 +118,38 @@ class SpoonsClient:
             self.discard(discard_card)
             self.mycards.remove(discard_card)
             
-            if self.four_of_a_kind():
-                self.grab_spoon()
+            #if self.four_of_a_kind():
+            # instead of checking if four of a kind, have the option to alaways grab spoon, the func will check if four of a kind
+            self.grab_spoon()
 
             # if resp is 'eliminated':
             #   break
 
     def grab_spoon(self):
-        input("PRESS ENTER TO GRAB SPOON!")
-        msg = { 'method': 'grab_spoon' }
-        msg = json.dumps(msg)
-        self.send_request(msg)
-        resp = self.recv_resp(msg)
-        ## print whether eliminated or moving on
-        ##return resp
+        print("Are you ready to grab a spoon?")
+        wantSpoon = input("PRESS X TO GRAB SPOON!")
+        # user gets correct card line up and grabs spoon
+        if wantSpoon == 'X\n':
+            if self.four_of_a_kind():
+                currTime = time.time_ns()
+                # check if im doing the messages right, just doing it based off of the code I saw megan right
+                msg = { 'method': 'grab_spoon', 'time': str(currTime)}
+                msg = json.dumps(msg)
+                self.send_request(msg)
+                resp = self.recv_resp(msg)
+                server_ack = json.loads(msg)
+                status = server_ack['status']
+                if status == 'success':
+                    if server_ack['spoons_left'] == 0:
+                        print("You got the last spoon. You win!!")
+                    else:
+                        print("You successfully grabbed a spoon!\nWait for the other players to grab the spoons for the next round.")
+                 ## print whether eliminated or moving on
+                 ##return resp
+            else:
+                print("Invalid cards to grab spoon. Keep playing!")
+       
+       
 
 
     def get_cards(self):
@@ -231,6 +249,7 @@ class SpoonsClient:
                 tens[index]=0
 
         if graphics:
+            # check that tens works
             # adjust for different spacing with 10 (two digit number)
             print(f'\t+-----+\t\t+-----+\t\t+-----+\t\t+-----+\t\t')
             if tens[0]==1:

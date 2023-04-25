@@ -5,6 +5,7 @@ import os
 import select
 from CardDeck import *
 import time
+import asynchio
 
 class SpoonsServer:
     def __init__(self, game_name, expected_players):
@@ -13,7 +14,8 @@ class SpoonsServer:
         self.port = 9000
         self.game_name = game_name
         self.last_sent = 0
-
+        self.BroadCastQueue = []
+        
         self.players = []
         self.players_info = {}
         self.expected_players = expected_players
@@ -21,6 +23,7 @@ class SpoonsServer:
         self.num_spoons = 0
         self.deck = CardDeck()
         self.discard_pile = []
+        self.timeSpoonGrabbed = -1
         # ??? self.spoon_port = 
 
         # for port already used error
@@ -41,11 +44,13 @@ class SpoonsServer:
 
         # will continue playing games until server is killed
         while True:
+            # ask megan, is this a timeout for players to join??
             if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
                 self.send_udp()
                 self.last_sent = time.time_ns()
 
             print('Game loading...')
+
             while self.num_players < self.expected_players:
 
                 ### this wasn't working rn but could add something that conintues with however many players you have rn it you go over a time limit
@@ -67,10 +72,29 @@ class SpoonsServer:
             print('Starting game!')
             self.play_game()
 
-        
+    def spoons_thread(self,player,msg):
+        msg = json.loads(msg)
+        method = msg['method']
+        if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
+                self.timeSpoonGrabbed = int(msg['time'])
+                self.num_spoons -= 1
+                ack_msg = {'method': "grab_spoon", 'status': 'success','spoons_left': str(num_spoons)}
+                response = self.execute_msg(player, ack_msg)
+                response = json.dumps(response)
+                player.send(response.encode())
+                self.players_info[player]['spoon_grabbed'] = 1
+                broadcast_msg = {'method': 'grab_spoon', 'spoons_left': str(num_spoons)}
+                for p in players_info:
+                    if players_info[p]['spoon_grabbed'] == 0
+                        BroadCastQueue.append(players_info[p])
+                        # need to broadcast at once.... 
+            else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
+                
+
+
     def play_game(self):
         self.deal_cards()
-
+        self.num_spoons = self.num_players - 1
         # Set pickup pile of player #0 to be remaining_cards in deck object
         self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
     
@@ -174,6 +198,10 @@ class SpoonsServer:
                 self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
 
             resp = { 'result': 'success' }
+        elif method == 'grab_spoon':
+            self.spoons_thread(player, msg)
+            # ??
+            return
 
         return resp
 
