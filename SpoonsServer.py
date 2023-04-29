@@ -64,6 +64,8 @@ class SpoonsServer:
                 #     break
 
                 (new_player, addr) = self.master.accept()
+                print("new player: ", new_player, "address: ", addr)
+                #print()
                 self.players.append(new_player)
                 self.init_player_info(new_player, self.num_players)
                 print('\tPlayer', self.num_players, 'joined!')
@@ -288,11 +290,25 @@ class SpoonsServer:
             for p in players_info:
                 if players_info[p]['spoon_grabbed'] == 0:
                     self.BroadCastQueue.append(players_info[p])
+                    #asyncio.run(tcp_echo_client('GRAB SPOON!'))
                     # need to broadcast at once.... 
         #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
             
 
-  
+    async def tcp_echo_client(self, message):
+        reader, writer = await asyncio.open_connection(
+            '127.0.0.1', self.port)
+
+        print(f'Send: {message!r}')
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(100)
+        print(f'Received: {data.decode()!r}')
+
+        print('Close the connection')
+        writer.close()
+        await writer.wait_closed()
 
 
 
