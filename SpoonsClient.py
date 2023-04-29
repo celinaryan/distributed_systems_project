@@ -13,9 +13,9 @@ class SpoonsClient:
     diamond = "\u2666"
     spade = "\u2660"
 
-    def __init__(self, game_name, player_name):
+    def __init__(self, game_name):
         self.game_name = game_name
-        self.player_name = player_name
+        #self.player_name = player_name
         self.host = None
         self.port = 0
         self.lastheardfrom = 0

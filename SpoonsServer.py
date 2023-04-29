@@ -66,9 +66,11 @@ class SpoonsServer:
                 (new_player, addr) = self.master.accept()
                 self.players.append(new_player)
                 self.init_player_info(new_player, self.num_players)
-                #print('\tPlayer', self.num_players, 'joined!')
+                print('\tPlayer', self.num_players, 'joined!')
+
+                # i want to see if i can get this to work
                 # instead of saying player 0 joined, want to see the name of person joined
-                print('\tPlayer: ', self.num_players, '\nWith name: ',str(new_player.player_name), 'joined!\n')
+                #print('\tPlayer: ', self.num_players, '\nWith name: ',str(new_player.player_name), 'joined!\n')
                 msg = { 'method': 'join_game', 'status': 'success', 'id': self.num_players }
                 resp = json.dumps(msg).encode()
                 new_player.send(resp)
