@@ -66,7 +66,9 @@ class SpoonsServer:
                 (new_player, addr) = self.master.accept()
                 self.players.append(new_player)
                 self.init_player_info(new_player, self.num_players)
-                print('\tPlayer', self.num_players, 'joined!')
+                #print('\tPlayer', self.num_players, 'joined!')
+                # instead of saying player 0 joined, want to see the name of person joined
+                print('\tPlayer: ', self.num_players, '\nWith name: ',str(new_player.player_name), 'joined!\n')
                 msg = { 'method': 'join_game', 'status': 'success', 'id': self.num_players }
                 resp = json.dumps(msg).encode()
                 new_player.send(resp)
@@ -98,6 +100,7 @@ class SpoonsServer:
 
             ready, _, _ = select.select(self.players, [], [])
             random.shuffle(ready)   ### ??? make service more fair? is there a way to order them in the order the messages were recv'ed?
+                                    # yes I think that's good
 
             for player in ready:
                 # player socket closed
@@ -157,7 +160,8 @@ class SpoonsServer:
                                         'cards': [],
                                         'pickup_deck': [],
                                         'player_num': self.num_players,
-                                        'spoon_grabbed': 0
+                                        'spoon_grabbed': 0,
+                                        'player_name': ''
                                     }
 
     def execute_msg(self, player, msg):
