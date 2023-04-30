@@ -1,10 +1,11 @@
 import sys
 import asyncio
-
+from SpoonsClient import SpoonsClient
 class ClientAsync:
-    def __init__(ClientInstance, host, port):
+    def __init__(self, game_name, host, port):
     #def main(id=None, myport=None, ip=None, port=None):
-        self.ClientInstance = ClientInstance
+        self.ClientInstance = SpoonsClient(game_name)
+        self.game_name = game_name
         self.port = port
         self.host = host
         self.loopDone = 0

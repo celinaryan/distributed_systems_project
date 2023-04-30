@@ -101,7 +101,7 @@ class SpoonsClient:
     def play_game(self):
         # connect to async future loop
         # check that self (first param) works/ is right, 
-        clientAsyncLoop  = ClientAsync(self, self.host, self.port)
+        clientAsyncLoop  = ClientAsync(self.game_name, self.host, self.port)
         self.grabbing_started = clientAsyncLoop
         # server will send hand of cards
         self.get_cards()
