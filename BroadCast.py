@@ -1,15 +1,15 @@
 import sys
 import asyncio
 class BroadCast:
-        def __init__(self, BroadCastQueue):
-            self.message = asyncio.Future()
-            self.BroadCastQueue = BroadCastQueue
+    def __init__(self, BroadCastQueue):
+        self.message = asyncio.Future()
+        self.BroadCastQueue = BroadCastQueue
 
-        async def run(self):
-            while True:
-                await asyncio.sleep(1.0)
-                self.message.set_result(b'SPOON WAS GRABBED!! GRAB SPOON ASAP!')
-                self.message = asyncio.Future()
+    async def run(self):
+        while True:
+            await asyncio.sleep(1.0)
+            self.message.set_result(b'SPOON WAS GRABBED!! GRAB SPOON ASAP!')
+            self.message = asyncio.Future()
 
     async def async_handler(self, name, message_generator):
         while True:

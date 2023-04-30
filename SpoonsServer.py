@@ -347,7 +347,7 @@ class SpoonsServer:
                         self.grab_time_stamp[player] = self.timeSpoonGrabbed
                 # we will sort the dictionary of time grabs and send responses to the people who grabbed the spoons first
                 sortedTimes = sorted(self.grab_time_stamp)
-                if(len(sortedTimes) == self.num_spoons + 1)
+                if(len(sortedTimes) == self.num_spoons + 1):
                     eliminated_player = sortedTimes[-1]
                     for player in sortedTimes:
                         if player == eliminated_player:
