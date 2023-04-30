@@ -32,15 +32,18 @@ class SpoonsServer:
         self.timeSpoonGrabbed = -1
         self.first_spoon_grabbed = 0
         self.moving_forward = []
-
+        #self.loop = asyncio.get_event_loop()
        
-        # for port already used error
+       # for port already used error
         for i in range(1,15):
             try:
                 self.master.bind((socket.gethostname(), self.port))
                 break
             except:
                 self.port += 1
+        
+       '''
+        
         
         if(self.master.listen(5) == -1):
             print('Failed to listen on port ' + str(self.master.getsockname()[1]))
@@ -93,9 +96,77 @@ class SpoonsServer:
                 self.init_game() 
 
             #### send winner message to the winning player 
-    def broadcast(self, message):
-        PUBSUB.publish(message)
-       
+    '''
+    async def start(self):
+        # Create the server socket
+        self.master = await asyncio.start_server(socket.gethostname(), self.port)
+        
+        # Wait for all players to join
+        while self.num_players < self.expected_players:
+            (new_player, addr) = await self.master.accept()
+            print("new player: ", new_player, "address: ", addr)
+            self.players.append(new_player)
+            self.init_player_info(new_player, self.num_players)
+            print('\tPlayer', self.num_players, 'joined!')
+            
+            # Send a response to the client
+            msg = { 'method': 'join_game', 'status': 'success', 'id': self.num_players }
+            resp = json.dumps(msg).encode()
+            await new_player.send(resp)
+            
+            # Start a new task to handle the client
+            asyncio.create_task(self.handle_client(self.num_players, new_player))
+            self.num_players += 1
+            
+        # All players have joined, start the game
+        self.init_game()
+    
+    async def handle_client(self, player_id, player):
+        while True:
+            # Wait for a message from the client
+            data = await player.recv(1024)
+            if not data:
+                # The client has disconnected
+                self.players[player_id] = None
+                print('Player', player_id, 'disconnected')
+                break
+            
+            # Broadcast the message to all other players
+            msg = { 'method': 'broadcast', 'data': data.decode() }
+            resp = json.dumps(msg).encode()
+            for i, p in enumerate(self.players):
+                if p is not None and i != player_id:
+                    await p.send(resp)
+    
+    async def handle_connection(self, reader, writer):
+        # This method is needed to handle the connection when a client connects using asyncio.start_server
+        player_id = self.num_players
+        self.players.append(writer)
+        self.init_player_info(writer, player_id)
+        print('\tPlayer', self.num_players, 'joined!')
+        
+        # Send a response to the client
+        msg = { 'method': 'join_game', 'status': 'success', 'id': player_id }
+        resp = json.dumps(msg).encode()
+        await writer.write(resp)
+        
+        # Start a new task to handle the client
+        asyncio.create_task(self.handle_client(player_id, writer))
+        self.num_players += 1
+
+    '''
+    async def broadcast(self):
+        while self.BroadCastQueue:
+            client = self.BroadCastQueue.pop(0)
+            client.notify('Grab a spoon!')
+            await asyncio.sleep(0.1)  # wait a bit before notifying the next client
+    def start(self):
+        self.loop.run_forever()
+
+    def add_waiting_client(self, client):
+        self.BroadCastQueue.append(client)
+    '''
+
     def init_game(self):
         # Set pickup pile of player #0 to be remaining_cards in deck object
         self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
@@ -302,7 +373,7 @@ class SpoonsServer:
                     self.BroadCastQueue.append(players_info[p])
                     #asyncio.run(tcp_echo_client('GRAB SPOON!'))
                     # need to broadcast at once.... '
-            broadcast = BroadCast(self.BroadCastQueue)
+            await self.broadcast()
         #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
             
             # now we will go through ready sockets and recv messages for grabbing

@@ -28,7 +28,9 @@ class SpoonsClient:
         self.id = -1
         self.grabbing_started = 0
         self.eliminated = 0
-        self.PUBSUB = PubSub()
+        #self.PUBSUB = PubSub()
+        self.reader = None
+        self.writer = None
         # self.multicast_group = '224.3.29.71'
         # self.spoon_server_address = ('', 10000)
         # self.spoon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -39,10 +41,55 @@ class SpoonsClient:
         self.connect_to_server()
         while(not self.eliminated):
             self.play_game()
+    '''
+    def notify(self, message):
+        print(f"Server says: {message}")
 
-    async def handler(websocket):
-        async for message in PUBSUB:
-            await websocket.send(message)
+    async def grab_spoon(self):
+        self.server.add_waiting_client(self)
+        await asyncio.sleep(0)  # give control back to the event loop
+    '''
+
+    async def run(self):
+        try:
+            self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
+
+            # Send the join game message to the server
+            join_msg = {'method': 'join_game', 'player_name': self.player_name}
+            join_msg_encoded = json.dumps(join_msg).encode()
+            self.writer.write(join_msg_encoded)
+            await self.writer.drain()
+
+            # Receive the join game response from the server
+            join_resp_encoded = await self.reader.readline()
+            join_resp = json.loads(join_resp_encoded.decode())
+
+            if join_resp['status'] == 'success':
+                self.player_id = join_resp['id']
+                print(f'Joined game as player {self.player_id} ({self.player_name})')
+
+                # Start listening for updates from the server
+                await self.receive_updates()
+            else:
+                print('Failed to join game')
+        except Exception as e:
+            print(f'Error: {e}')
+        finally:
+            if self.writer:
+                self.writer.close()
+    # asynchronous coroutine receives updates from the server and processes them as needed
+    async def receive_updates(self):
+        while True:
+            update_encoded = await self.reader.readline()
+            update = json.loads(update_encoded.decode())
+            print(f'Received update: {update}')
+
+    async def grab_spoon(self):
+        # Send the grab spoon message to the server
+        grab_spoon_msg = {'method': 'grab_spoon', 'player_id': self.player_id}
+        grab_spoon_msg_encoded = json.dumps(grab_spoon_msg).encode()
+        self.writer.write(grab_spoon_msg_encoded)
+        await self.writer.drain()
 
     def find_name(self):
         while(True):
