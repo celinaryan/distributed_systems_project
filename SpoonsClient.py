@@ -7,24 +7,15 @@ import struct
 import select
 #from ClientAsync import *
 import asyncio
-from aioconsole import ainput
-
+#from aioconsole import ainput
+from PubSub import PubSub
 class SpoonsClient:
     heart = "\u2665"
     club = "\u2663"
     diamond = "\u2666"
     spade = "\u2660"
 
-    def __init__(self, game_name, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        #*************
-        # extra asyncio stuff
-        self.__reader: asyncio.StreamReader = reader
-        self.__writer: asyncio.StreamWriter = writer
-        self.__ip: str = writer.get_extra_info('peername')[0]
-        self.__port: int = writer.get_extra_info('peername')[1]
-        self.nickname: str = str(writer.get_extra_info('peername'))
-        #*************
-
+    def __init__(self, game_name):
         self.game_name = game_name
         #self.player_name = player_name
         self.host = None
@@ -37,6 +28,7 @@ class SpoonsClient:
         self.id = -1
         self.grabbing_started = 0
         self.eliminated = 0
+        self.PUBSUB = PubSub()
         # self.multicast_group = '224.3.29.71'
         # self.spoon_server_address = ('', 10000)
         # self.spoon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -47,59 +39,11 @@ class SpoonsClient:
         self.connect_to_server()
         while(not self.eliminated):
             self.play_game()
-    
-    #*************
-    # more asyncio stuff
-    def __str__(self):
-        '''
-        Outputs client information as '<nickname> <ip>:<port>'
-        '''
-        return f"{self.nickname} {self.ip}:{self.port}"
 
-    @property
-    def reader(self):
-        '''
-        Gets the StreamReader associated with a client.
-        '''
-        return self.__reader
+    async def handler(websocket):
+        async for message in PUBSUB:
+            await websocket.send(message)
 
-    @property
-    def writer(self):
-        '''
-        Gets the StreamWriter associated with a client.
-        '''
-        return self.__writer
-
-    @property
-    def ip(self):
-        '''
-        Gets the ip associated with a client
-        '''
-        return self.__ip
-
-    @property
-    def port(self):
-        '''
-        Gets the port associated with a client
-        '''
-        return self.__port
-    
-    async def get_message(self):
-        '''
-        Retrieves the incoming message from a client and returns it in string format.
-        Parameters
-        ———-
-        client : Client
-            The client who's message will be received.
-        ———-
-        Returns
-        ——-
-        str
-            The incoming client's message as a string.
-        ——-
-        '''
-        return str((await self.reader.read(255)).decode('utf8'))
-    #*************
     def find_name(self):
         while(True):
             name_server = http.client.HTTPConnection('catalog.cse.nd.edu', '9097')
@@ -163,9 +107,10 @@ class SpoonsClient:
     def play_game(self):
         # connect to async future loop
         # check that self (first param) works/ is right, 
-        clientAsyncLoop  = ClientAsync(self.game_name, self.host, self.port)
-        self.grabbing_started = clientAsyncLoop
+        #clientAsyncLoop  = ClientAsync(self.game_name, self.host, self.port)
+        #self.grabbing_started = clientAsyncLoop
         # server will send hand of cards
+        
         self.get_cards()
 
         # join UDP multicast group for spoon grab messages
