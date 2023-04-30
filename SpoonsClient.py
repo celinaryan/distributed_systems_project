@@ -217,7 +217,7 @@ class SpoonsClient:
                     return 'eliminated'
         else:
             # in case user doesnt press x but grabbing has begun
-            if(grabbing_started==1)
+            if(grabbing_started==1):
                 print("Are you sure you don't want to grab a spoon?\n")
                 self.grab_spoon()
             else: # keep playing
