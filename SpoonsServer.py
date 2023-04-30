@@ -6,6 +6,7 @@ import select
 from CardDeck import *
 import time
 import asyncio
+from BroadCast import * 
 
 class SpoonsServer:
     def __init__(self, game_name, expected_players):
@@ -15,12 +16,11 @@ class SpoonsServer:
         self.game_name = game_name
         self.last_sent = 0
         self.BroadCastQueue = []
+        self.grab_time_stamp = {}
         # self.multicast_group = ('224.3.29.71', 10000)
         # self.multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self.multicast_sock.settimeout(0.2)
         # self.multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, (b'1'))
-
-        
         self.players = []
         self.players_info = {}
         self.expected_players = expected_players
@@ -62,7 +62,10 @@ class SpoonsServer:
                 # if time.time_ns() - self.game_init_time > 1e+10:
                 #     self.game_init_time = time.time_ns()
                 #     break
-
+                # new_player is:
+                # <socket.socket fd=5, family=AddressFamily.AF_INET, type=SocketKind.SOCK_STREAM, proto=0, laddr=('129.74.152.140', 9000), raddr=('129.74.152.141', 54564)>
+                # addr is:
+                # address:  ('129.74.152.141', 54564)
                 (new_player, addr) = self.master.accept()
                 print("new player: ", new_player, "address: ", addr)
                 #print()
@@ -85,27 +88,33 @@ class SpoonsServer:
 
             while self.num_players > 1:
                 print('Starting game!')
-                self.play_game() 
+                self.init_game() 
 
             #### send winner message to the winning player 
-
-    def play_game(self):
-        self.deal_cards()
-
-        self.first_spoon_grabbed = 0
-        self.num_spoons = self.num_players - 1
+    def init_game(self):
         # Set pickup pile of player #0 to be remaining_cards in deck object
         self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
+        self.play_game()
+
+    def play_game(self):
+
+        # moved initilization to function called init_game so we can interleave grabbing 
+        # spoon messages also
     
         while self.game_over == 0:
             if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
                 self.send_udp()
                 self.last_sent = time.time_ns()
-
-            ready, _, _ = select.select(self.players, [], [])
-            random.shuffle(ready)   ### ??? make service more fair? is there a way to order them in the order the messages were recv'ed?
-                                    # yes I think that's good
-
+            
+            # either recieving message for picking up cards or spoons
+            if self.first_spoon_grabbed == 0:
+                ready, _, _ = select.select(self.players, [], [])
+                random.shuffle(ready)   ### ??? make service more fair? is there a way to order them in the order the messages were recv'ed?
+                                        # yes I think that's good
+            else: # means we're in server thread
+                ready, _, _ = select.select(self.BroadCastQueue, [], [])
+                self.broadcast_ready = ready
+                
             for player in ready:
                 # player socket closed
                 if player.fileno() == -1:
@@ -114,46 +123,46 @@ class SpoonsServer:
                     self.players -= 1
                     self.spoons -= 1
                     continue  # continue to next round
+            # QUESTION: this wasnt indented, it should be right? massive block, to player.send rsp encode
+                try: 
+                    bytes_to_read = player.recv(2).decode()
+                except ConnectionResetError as cre:
+                    break
 
-            try: 
-                bytes_to_read = player.recv(2).decode()
-            except ConnectionResetError as cre:
-                break
+                if bytes_to_read == '':
+                    self.players.remove(player)
+                    del self.players_info[player]
+                    player.close()
+                    continue
 
-            if bytes_to_read == '':
-                self.players.remove(player)
-                del self.players_info[player]
-                player.close()
-                continue
+                msg = player.recv(int(bytes_to_read)).decode()
+                bytes_read = len(msg)
 
-            msg = player.recv(int(bytes_to_read)).decode()
-            bytes_read = len(msg)
+                if bytes_read == 0:
+                    self.players.remove(player)
+                    del self.players_info[player]
+                    player.close()
+                    continue
 
-            if bytes_read == 0:
-                self.players.remove(player)
-                del self.players_info[player]
-                player.close()
-                continue
+                if(msg == -1):
+                    print('Failed to recieve message. Please try again.')
+                    continue
 
-            if(msg == -1):
-                print('Failed to recieve message. Please try again.')
-                continue
+                while int(bytes_read) < int(bytes_to_read):
+                    msg += player.recv(int(bytes_to_read) - bytes_read).decode()
 
-            while int(bytes_read) < int(bytes_to_read):
-                msg += player.recv(int(bytes_to_read) - bytes_read).decode()
+                response = self.execute_msg(player, msg)
 
-            response = self.execute_msg(player, msg)
+                # eliminate player
+                if response['result'] == 'eliminated':
+                    response = json.dumps(response)
+                    player.send(response.encode())
+                    self.players_info.pop(player)
+                    self.players.remove(player)
+                    return
 
-            # eliminate player
-            if response['result'] == 'eliminated':
                 response = json.dumps(response)
                 player.send(response.encode())
-                self.players_info.pop(player)
-                self.players.remove(player)
-                return
-
-            response = json.dumps(response)
-            player.send(response.encode())
             
         return
 
@@ -165,11 +174,12 @@ class SpoonsServer:
                                         'pickup_deck': [],
                                         'player_num': self.num_players,
                                         'spoon_grabbed': 0,
-                                        'player_name': ''
+                                        'player_name': '',
+                                        'grab_time_stamp': -1
                                     }
 
     def execute_msg(self, player, msg):
-        grab_msg = { 'method': 'GRAB', 'result': '' }
+        #grab_msg = { 'method': 'GRAB', 'result': '' }
         msg = json.loads(msg)
         method = msg['method']
 
@@ -178,8 +188,8 @@ class SpoonsServer:
             resp = { 'method': 'get_cards', 'result': 'success', 'cards': self.players_info[player]['cards'] }
 
         elif method == 'pickup':
-            if self.first_spoon_grabbed:
-                return grab_msg
+            #if self.first_spoon_grabbed:
+            #    return grab_msg
 
             if len(self.players_info[player]['pickup_deck']) == 0:
 
@@ -200,8 +210,8 @@ class SpoonsServer:
             resp = { 'method': 'pickup', 'result': 'success', 'card': new_card }
 
         elif method == 'discard':
-            if self.first_spoon_grabbed:
-                return grab_msg
+            #if self.first_spoon_grabbed:
+            #    return grab_msg
 
             self.players_info[player]['cards'].remove(msg['card'])
             next_ind = self.players_info[player]['player_num'] + 1
@@ -214,27 +224,17 @@ class SpoonsServer:
                 self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
 
             resp = { 'method': 'discard', 'result': 'success' }
-
+            return resp
+            
         elif method == 'grab_spoon':  
-
-            # first spoon to be grabbed
+            # first spoon to be grabbed, enter spoon_thread for broadcast and grabbing spoon event
             if self.first_spoon_grabbed == 0:
-                self.first_spoon_grabbed = 1
-                self.num_spoons -= 1
-                resp = {'result': 'next_round'}
+                self.spoons_thread(self.players_info[player],msg)
+            
+        
 
-            elif self.num_spoons > 0:
-                self.num_spoons -= 1
-                resp = {'result': 'next_round'}
-
-            # remove last to grab
-            elif self.num_spoons == 0:
-                self.num_players -= 1
-                resp = { 'result': 'eliminated' }
-
-        return resp
-
-
+    
+    
     # def spoon_multicast(self):
     #     self.multicast_sock.settimeout(5)
 
@@ -279,39 +279,125 @@ class SpoonsServer:
         #     print("FAILED", e)
 
     def spoons_thread(self, player, msg):
+        # first spoon is grabbed
         if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
-            self.timeSpoonGrabbed = int(msg['time'])
+            self.timeSpoonGrabbed = float(msg['time'])
             self.num_spoons -= 1
             ack_msg = {'method': "grab_spoon", 'status': 'success','spoons_left': str(num_spoons)}
             response = json.dumps(response)
             player.send(response.encode())
             self.players_info[player]['spoon_grabbed'] = 1
-            broadcast_msg = {'method': 'grab_spoon', 'spoons_left': str(num_spoons)}
+            self.players_info[player]['grab_time_stamp'] = self.timeSpoonGrabbed 
+            self.first_spoon_grabbed = 1
+            #broadcast_msg = {'method': 'grab_spoon', 'spoons_left': str(num_spoons)}
+            self.grab_time_stamp[player] = self.timeSpoonGrabbed
             for p in players_info:
                 if players_info[p]['spoon_grabbed'] == 0:
                     self.BroadCastQueue.append(players_info[p])
                     #asyncio.run(tcp_echo_client('GRAB SPOON!'))
-                    # need to broadcast at once.... 
+                    # need to broadcast at once.... '
+            broadcast = BroadCast(self.BroadCastQueue)
         #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
             
+            # now we will go through ready sockets and recv messages for grabbing
+            # this will recieve the message and then order the spoon grabs by time
+            # then we will know who is eliminated
+            #self.play_game()
+            while(self.num_spoons>0):
+                ready, _, _ = select.select(self.BroadCastQueue, [], [])
+                self.broadcast_ready = ready
+                    
+                for player in ready:
+                    # player socket closed
+                    if player.fileno() == -1:
+                        self.players.remove(player)
+                        del self.players_info[player]
+                        self.players -= 1
+                        self.spoons -= 1
+                        continue  # continue to next round
+                # QUESTION: this wasnt indented, it should be right? massive block, to player.send rsp encode
+                    try: 
+                        bytes_to_read = player.recv(2).decode()
+                    except ConnectionResetError as cre:
+                        break
+                    if bytes_to_read == '':
+                        self.players.remove(player)
+                        del self.players_info[player]
+                        player.close()
+                        continue
+                    msg = player.recv(int(bytes_to_read)).decode()
+                    bytes_read = len(msg)
+                    if bytes_read == 0:
+                        self.players.remove(player)
+                        del self.players_info[player]
+                        player.close()
+                        continue
+                    if(msg == -1):
+                        print('Failed to recieve message. Please try again.')
+                        continue
+                    while int(bytes_read) < int(bytes_to_read):
+                        msg += player.recv(int(bytes_to_read) - bytes_read).decode()
 
-    async def tcp_echo_client(self, message):
-        reader, writer = await asyncio.open_connection(
-            '127.0.0.1', self.port)
+                    method = msg['method']
+                    #timeRecv = msg
+                    if method == 'grab_spoon':
+                        # int double or float??
+                        timeGrabbed = float(msg['time'])
+                        self.players_info[player]['spoon_grabbed_time'] = timeGrabbed
+                        self.grab_time_stamp[player] = self.timeSpoonGrabbed
+                # we will sort the dictionary of time grabs and send responses to the people who grabbed the spoons first
+                sortedTimes = sorted(self.grab_time_stamp)
+                if(len(sortedTimes) == self.num_spoons + 1)
+                    eliminated_player = sortedTimes[-1]
+                    for player in sortedTimes:
+                        if player == eliminated_player:
+                            response = {'result': 'eliminated'}
+                            response = json.dumps(response)
+                            player.send(response.encode())
+                            self.players_info.pop(player)
+                            self.players.remove(player)
+                        else:
+                            self.players_info[player]['spoon_grabbed'] = 1
+                            self.num_spoons -= 1
+                            response = {'result': 'next_round'}
+                            response = json.dumps(response)
+                            player.send(response.encode())
+                else:
+                    for player in sortedTimes:
+                        self.players_info[player]['spoon_grabbed'] = 1
+                        self.num_spoons -= 1
+                        response = {'result': 'next_round'}
+                        response = json.dumps(response)
+                        player.send(response.encode())
+        
+        if(len(player_info)==1):
+            self.game_over = 1
+            print("Winner is Player ", self.players_info[player]['id'][0])
+            return 0
+        else:
+            # go to next round
+            self.num_players -=1
+            self.start_next_round()
 
-        print(f'Send: {message!r}')
-        writer.write(message.encode())
-        await writer.drain()
+    # move onto the next round with eliminated player removed, one less spoon, new shuffled hands
+    def start_next_round(self):
+        # what we need reset at beginning of each new round
+        self.BroadCastQueue = []
+        self.grab_time_stamp = {}
+        self.deck = CardDeck()
+        self.discard_pile = []
+        self.timeSpoonGrabbed = -1
+        self.first_spoon_grabbed = 0
+        self.remaining_cards = []
+        self.deal_cards()
+        self.first_spoon_grabbed = 0
+        self.num_spoons = self.num_players - 1
 
-        data = await reader.read(100)
-        print(f'Received: {data.decode()!r}')
-
-        print('Close the connection')
-        writer.close()
-        await writer.wait_closed()
-
-
-
+        print("Starting next round with ", self.num_players, "players")
+        for i, player in enumerate(self.players):
+            self.init_player_info(player, i)
+        self.init_game()
+        
 
     def deal_cards(self):
         hands = self.deck.deal_cards(self.num_players)

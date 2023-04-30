@@ -5,7 +5,8 @@ import http.client
 import time
 import struct 
 import select
-
+from ClientAsync import *
+import asyncio
 
 class SpoonsClient:
     heart = "\u2665"
@@ -98,6 +99,10 @@ class SpoonsClient:
                 self.server_retries+=1
 
     def play_game(self):
+        # connect to async future loop
+        # check that self (first param) works/ is right, 
+        clientAsyncLoop  = ClientAsync(self, self.host, self.port)
+        self.grabbing_started = clientAsyncLoop
         # server will send hand of cards
         self.get_cards()
 
@@ -107,9 +112,9 @@ class SpoonsClient:
         # mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         # self.spoon_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-
+        # want to do while ClientAsyncLoop?
+        # await loop.clientAsyncLoop
         while(self.grabbing_started == 0):
-        
             print('\nYOUR HAND:')
             self.display_cards(self.mycards, 1)
 
@@ -156,7 +161,9 @@ class SpoonsClient:
                     return
 
                 self.mycards.remove(discard_card)
-
+            self.grabbing_started = clientAsyncLoop
+        else:
+            self.grab_spoon()
     # def check_spoon_grab(self):
     #     #while 1:
     #     print('checking spoons')
@@ -172,27 +179,49 @@ class SpoonsClient:
     #             self.spoon_sock.sendto('ack', addr)
 
     def grab_spoon(self):
-        # print("Are you ready to grab a spoon?")
-        # wantSpoon = input("PRESS x TO GRAB SPOON!")
+        print("Are you ready to grab a spoon?")
+        wantSpoon = input("PRESS x TO GRAB SPOON!")
         # user gets correct card line up and grabs spoon
-        # if wantSpoon == 'x\n':
-
-
-        if self.four_of_a_kind() or self.grabbing_started:
-            msg = { 'method': 'grab_spoon'}
-            msg = json.dumps(msg)
-            self.send_request(msg)
-            resp = self.recv_resp(msg)
-            if resp['result'] == 'next_round':
-                print('SUCCESS!')
-                print('\tYou successfully grabbed a spoon. Moving on to the next round.')
-                return 'next_round'
-            elif resp['result'] == 'eliminated':
-                print('TOO SLOW')
-                print('\tYou were last to grab a spoon. You have been ELIMINATED.')
-                self.eliminated = 1
-                return 'eliminated'
-
+        if wantSpoon == 'x\n':
+            # first person to grab spoon
+            if self.four_of_a_kind() and self.grabbing_started == 0:
+                time = curr_time.time_ns()
+                msg = { 'method': 'grab_spoon','time': str(time)}
+                msg = json.dumps(msg)
+                self.send_request(msg)
+                server_ack = json.loads(msg)
+                status = server_ack['status']
+                if status == 'success':
+                    if server_ack['spoons_left'] == 0:
+                        print("You got the last spoon. You win!!")
+                    else:
+                        print("You successfully grabbed a spoon!\nWait for the other players to grab the spoons for the next round.")
+            elif not self.four_of_a_kind and self.grabbing_started == 0:
+                print("\nInvalid cards to grab spoon. Keep playing!")
+                return
+            elif self.grabbing_started == 1:
+                msg = { 'method': 'grab_spoon','time': str(time)}
+                msg = json.dumps(msg)
+                self.send_request(msg)
+                resp = self.recv_resp(msg)
+                resp = json.dumps(resp)
+                server_ack = json.loads(resp)
+                if server_ack['result'] == 'next_round':
+                    print('SUCCESS!')
+                    print('\tYou successfully grabbed a spoon. Moving on to the next round.')
+                    return 'next_round'
+                elif server_ack['result'] == 'eliminated':
+                    print('TOO SLOW')
+                    print('\tYou were last to grab a spoon. You have been ELIMINATED.')
+                    self.eliminated = 1
+                    return 'eliminated'
+        else:
+            # in case user doesnt press x but grabbing has begun
+            if(grabbing_started==1)
+                print("Are you sure you don't want to grab a spoon?\n")
+                self.grab_spoon()
+            else: # keep playing
+                return
             # print('before')
             # data, addr = self.spoon_sock.recvfrom(1024)
             # print('after')
@@ -206,8 +235,7 @@ class SpoonsClient:
             #         print("You successfully grabbed a spoon!\nWait for the other players to grab the spoons for the next round.")
                 ## print whether eliminated or moving on
                 ##return resp
-        else:
-            print("\nInvalid cards to grab spoon. Keep playing!")
+        
        
 
     def get_cards(self):
@@ -223,10 +251,10 @@ class SpoonsClient:
         msg = json.dumps(msg)
         self.send_request(msg)
         resp = self.recv_resp(msg)
-        if resp['method'] == 'GRAB':
-            self.grabbing_started = 1
-            x = input('GRABBING STARTED!\n\tENTER x TO GRAB! : ')
-            return self.grab_spoon()
+        #if resp['method'] == 'GRAB':
+            # self.grabbing_started = 1
+            # x = input('GRABBING STARTED!\n\tENTER x TO GRAB! : ')
+            # return self.grab_spoon()
 
         if resp['result'] == 'success':
             return resp['card']
@@ -238,10 +266,10 @@ class SpoonsClient:
         msg = json.dumps(msg)
         self.send_request(msg)
         resp = self.recv_resp(msg)
-        if resp['method'] == 'GRAB':
-            self.grabbing_started = 1
-            x = input('GRABBING STARTED!\n\tENTER x TO GRAB!')
-            return self.grab_spoon()
+        #if resp['method'] == 'GRAB':
+        #    self.grabbing_started = 1
+        #    x = input('GRABBING STARTED!\n\tENTER x TO GRAB!')
+        #    return self.grab_spoon()
         return None
   
     def send_request(self, msg):
