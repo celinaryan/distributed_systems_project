@@ -199,8 +199,7 @@ class SpoonsServer:
             self.players.append(player)
             print(f"\tPlayer {self.num_players} joined!")
 
-            msg = { 'method': 'join_game', 'status': 'success', 'id': self.num_players }
-            resp = json.dumps(msg).encode()
+            resp = { 'method': 'join_game', 'status': 'success', 'id': self.num_players }
 
             # If there is an expected # of players, start running the game in the background
             self.num_players += 1
@@ -251,8 +250,8 @@ class SpoonsServer:
             if self.first_spoon_grabbed == 0:
                 self.spoons_thread(self.players_info[player],msg)
         print(f"Resp: {resp}")
-        writer.write(resp.encode())
-        writer.drain()
+        writer.write(json.dumps(resp).encode())
+        await writer.drain()
 
     async def send_msg(self, player, msg):
         ...

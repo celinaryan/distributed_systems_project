@@ -34,8 +34,11 @@ class SpoonsClient:
         
         # lookup name and connect to server
         self.connect_to_server()
+    
+    async def run(self):
         while not self.eliminated:
-            self.play_game()
+            await self.play_game()
+
     '''
     def notify(self, message):
         print(f"Server says: {message}")
