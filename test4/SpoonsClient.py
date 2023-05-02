@@ -6,7 +6,11 @@ import time
 import struct 
 import select
 import asyncio
+from functools import partial
+from concurrent.futures.thread import ThreadPoolExecutor
 
+# hard coded server address for now
+SERVER = '0.0.0.0'
 class SpoonsClient:
     heart = "\u2665"
     club = "\u2663"
@@ -99,13 +103,13 @@ class SpoonsClient:
             for entry in name_server_entries:
                 try:
                     if self.host == None and entry['game_name'] == self.game_name: # save the first match
-                        self.host = entry['name']
+                        self.host = SERVER
                         self.port = entry['port']
                         self.lastheardfrom = entry['lastheardfrom']
 
                     elif entry['game_name'] == self.game_name:   # if exist more matches --> check lastheardfrom
                         if entry['lastheardfrom'] > self.lastheardfrom:
-                            self.host = entry['name']
+                            self.host = SERVER
                             self.port = entry['port']
                             self.lastheardfrom = entry['lastheardfrom']
                     
@@ -135,13 +139,13 @@ class SpoonsClient:
                 msg = json.dumps(msg)
                 self.send_request(msg)
                 resp = self.recv_resp(msg)
-                if resp['status'] == 'success':
-                    self.id = int(resp['id'])
-                    print('Connected to port: ', self.port)
-                    print('Welcome! You are player ' + str(self.id) + '!')
-                    if self.id == 0:
-                        print('\nYou are the first player in the circle! You will be picking up from the remaining deck and will begin the flow of cards.')
-                    break
+                #if resp['status'] == 'success':
+                self.id = int(resp['id'])
+                print('Connected to port: ', self.port)
+                print('Welcome! You are player ' + str(self.id) + '!')
+                if self.id == 0:
+                    print('\nYou are the first player in the circle! You will be picking up from the remaining deck and will begin the flow of cards.')
+                break
             except Exception as e:
                 print('Connection to server failed. Restarting connection.')
                 try:
@@ -154,22 +158,23 @@ class SpoonsClient:
                 time.sleep(2**self.server_retries)
                 self.server_retries+=1
 
-    def play_game(self):
+    async def play_game(self):
         self.get_cards()
+        get_input = partial(asyncio.get_event_loop().run_in_executor, ThreadPoolExecutor(1))
+
         while(self.grabbing_started == 0):
+            
             print('\nYOUR HAND:')
             self.display_cards(self.mycards, 1)
 
-            method = input("Enter 'p' to pickup next card\nEnter 'x' to try to grab a spoon\n")
+            method = await get_input(input, "Enter 'p' to pickup next card\nEnter 'x' to try to grab a spoon\n")
 
             if method != 'p' and method != 'x':
                 print('Invalid operation')
                 continue
-
             if method == 'x':
                 print('GRABBING SPOON')
                 self.grab_spoon()
-
             if method == 'p':
                 new_card = self.pickup()
                 if new_card == 'next_round':
@@ -180,7 +185,6 @@ class SpoonsClient:
                 elif new_card == None:
                     print('No cards in pick up deck yet. Try again.')
                     continue
-                
                 self.mycards.append(new_card)
                 print('NEW CARD:')
                 self.display_cards([new_card], 1)
@@ -194,16 +198,13 @@ class SpoonsClient:
                 while ind not in ['0', '1', '2', '3', '4']:
                     print('\tInvalid card selected.')
                     ind = input("\tEnter card to discard (0-4)")
-
                 ind = int(ind)
-
                 discard_card = self.mycards[ind]
                 resp = self.discard(discard_card)
                 if resp == 'next_round' or resp == 'eliminated':
                     return
-
                 self.mycards.remove(discard_card)
-            self.grabbing_started = clientAsyncLoop
+            sys.stdout.flush()
         else:
             self.grab_spoon()
     # def check_spoon_grab(self):
