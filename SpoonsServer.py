@@ -85,6 +85,10 @@ class SpoonsServer:
     def play_game(self):
         self.deal_cards()
 
+        ### TAKE OUT AFTER DEBUGGING ###
+        self.players_info[self.players[0]]['cards'] = ['4H', '4D', '4S', '4C']
+        ################################
+
         self.first_spoon_grabbed = 0
         self.num_spoons = self.num_players - 1
         # Set pickup pile of player #0 to be remaining_cards in deck object
@@ -96,7 +100,7 @@ class SpoonsServer:
                 self.last_sent = time.time_ns()
 
             ready, _, _ = select.select(self.players, [], [])
-            random.shuffle(ready)   ### ??? make service more fair? is there a way to order them in the order the messages were recv'ed?
+            random.shuffle(ready)
 
             for player in ready:
                 # player socket closed
@@ -212,8 +216,8 @@ class SpoonsServer:
         elif method == 'grab_spoon': 
             self.spoon_multicast() 
 
-            for p in self.players_info:
-                if p['player_num'] in moving_forward:
+            for p in self.players:
+                if self.players_info[p]['player_num'] in self.moving_forward:
                     resp = {'result': 'next_round'}
                     self.num_spoons -= 1
                 else:
@@ -223,24 +227,6 @@ class SpoonsServer:
             self.round_over = 1
             #self.reset()
             return resp
-
-            # first spoon to be grabbed
-            # if self.first_spoon_grabbed == 0:
-            #     self.first_spoon_grabbed = 1
-            #     self.num_spoons -= 1
-            #     resp = {'result': 'next_round'}
-            #     return resp
-
-            # elif self.num_spoons > 0:
-            #     self.num_spoons -= 1
-            #     resp = {'result': 'next_round'}
-            #     return resp
-
-            # # remove last to grab
-            # elif self.num_spoons == 0:
-            #     self.num_players -= 1
-            #     resp = { 'result': 'eliminated' }
-            #     return resp
 
 
     def spoon_multicast(self):
@@ -257,6 +243,7 @@ class SpoonsServer:
             while True:
                 try:
                     # data will be player_num
+                    print(self.multicast_sock)
                     data, addr = self.multicast_sock.recvfrom(1024)
                 except socket.timeout:
                     print('timed out no more responses')
@@ -265,67 +252,8 @@ class SpoonsServer:
                     print('received', data.decode(), 'from', addr)
                     self.moving_forward.append(data)
         finally:
-            print('closing socket')
-
-
-        #self.timeSpoonGrabbed = time.time_ns()
-        # print('2 here')
-        # # wait for responses from all players for 10s
-        # while time.time_ns() - self.timeSpoonGrabbed < 10e+9:
-        #     result = self.multicast_sock.sendto(msg, self.multicast_group)
-
-        #     print('3 here', result)
-        #     try: 
-        #         data, p = self.multicast_sock.recvfrom(1024)
-        #         print('4 here')
-        #         self.moving_forward.append(p)
-        #         self.players_info[p].spoon_grabbed = 1
-        #         print('received', data, 'from', p)
-
-        #     except socket.timeout:
-        #         print('too slow')
-
-
-        # notify eliminated players
-        # for p in self.players:
-        #     if p not in self.moving_forward:
-        #         msg = json.dumps('ELIMINATED').encode()
-        #         p.send(msg)
-        #         self.players_info.pop(p)
-        #         self.players.remove(p)
-        #     else:
-        #         msg = json.dumps('SPOON GRABBED. MOVING TO NEXT ROUND.').encode()
-        #         p.send(msg)
-
-
-        ## ? how to handle failure?
-        # except Exception as e:
-        #     print("FAILED", e)
-
-
-
-
-
-    # def spoons_thread(self, player, msg):
-    #     if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
-    #         self.timeSpoonGrabbed = int(msg['time'])
-    #         self.num_spoons -= 1
-    #         ack_msg = {'method': "grab_spoon", 'status': 'success','spoons_left': str(num_spoons)}
-    #         response = json.dumps(response)
-    #         player.send(response.encode())
-    #         self.players_info[player]['spoon_grabbed'] = 1
-    #         broadcast_msg = {'method': 'grab_spoon', 'spoons_left': str(num_spoons)}
-    #         for p in players_info:
-    #             if players_info[p]['spoon_grabbed'] == 0:
-    #                 self.BroadCastQueue.append(players_info[p])
-    #                 # need to broadcast at once.... 
-    #     #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
+            print('done multicasting')
             
-
-  
-
-
-
 
     def deal_cards(self):
         hands = self.deck.deal_cards(self.num_players)

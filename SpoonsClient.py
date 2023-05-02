@@ -34,6 +34,12 @@ class SpoonsClient:
         # lookup name and connect to server
         self.connect_to_server()
 
+        # join UDP multicast group for spoon grab messages
+        self.spoon_sock.bind(self.spoon_server_address)
+        group = socket.inet_aton(self.multicast_group)
+        mreq = struct.pack('4sL', group, socket.INADDR_ANY)
+        self.spoon_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
     def find_name(self):
         while(True):
             name_server = http.client.HTTPConnection('catalog.cse.nd.edu', '9097')
@@ -147,26 +153,7 @@ class SpoonsClient:
 
                 self.mycards.remove(discard_card)
 
-    # def check_spoon_grab(self):
-    #     #while 1:
-    #     print('checking spoons')
-    #     ready, _, _ = select.select([self.spoon_sock], [], [], 0)
-    #     for s in ready:
-    #         print('got in here')
-    #         data, addr = self.spoon_sock.recvfrom(1024)
-    #         data = json.loads(data.decode())
-    #         if data['msg'] == 'SPOON GRABBED! YOU HAVE 10 SECONDS TO TRY AND GRAB A SPOON!':
-                
-    #             print(data['msg'], flush=True)
-    #             method = input('ENTER x TO TRY TO GRAB A SPOON!\n')
-    #             self.spoon_sock.sendto('ack', addr)
-
     def monitor_spoons(self):
-        # join UDP multicast group for spoon grab messages
-        self.spoon_sock.bind(self.spoon_server_address)
-        group = socket.inet_aton(self.multicast_group)
-        mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-        self.spoon_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
         while True:
             print('waiting to receive spoon message')
@@ -179,15 +166,15 @@ class SpoonsClient:
 
 
     def grab_spoon(self):
-        # print("Are you ready to grab a spoon?")
-        # wantSpoon = input("PRESS x TO GRAB SPOON!")
-        # user gets correct card line up and grabs spoon
-        # if wantSpoon == 'x\n':
 
         if self.four_of_a_kind() or self.grabbing_started:
             msg = { 'method': 'grab_spoon'}
             msg = json.dumps(msg)
             self.send_request(msg)
+
+            print(self.spoon_sock)
+            self.monitor_spoons()
+
             resp = self.recv_resp(msg)
             if resp['result'] == 'next_round':
                 print('SUCCESS!')
@@ -199,19 +186,6 @@ class SpoonsClient:
                 self.eliminated = 1
                 return 'eliminated'
 
-            # print('before')
-            # data, addr = self.spoon_sock.recvfrom(1024)
-            # print('after')
-
-            # server_ack = json.loads(msg)
-            # status = server_ack['status']
-            # if status == 'success':
-            #     if server_ack['spoons_left'] == 0:
-            #         print("You got the last spoon. You win!!")
-            #     else:
-            #         print("You successfully grabbed a spoon!\nWait for the other players to grab the spoons for the next round.")
-                ## print whether eliminated or moving on
-                ##return resp
         else:
             print("\nInvalid cards to grab spoon. Keep playing!")
        
