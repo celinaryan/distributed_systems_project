@@ -49,7 +49,7 @@ class SpoonsClient:
         self.server.add_waiting_client(self)
         await asyncio.sleep(0)  # give control back to the event loop
     '''
-
+    '''
     async def run(self):
         try:
             self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
@@ -90,7 +90,8 @@ class SpoonsClient:
         grab_spoon_msg_encoded = json.dumps(grab_spoon_msg).encode()
         self.writer.write(grab_spoon_msg_encoded)
         await self.writer.drain()
-
+    '''
+    
     def find_name(self):
         while(True):
             name_server = http.client.HTTPConnection('catalog.cse.nd.edu', '9097')

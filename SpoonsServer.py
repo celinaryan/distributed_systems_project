@@ -10,7 +10,7 @@ from BroadCast import *
 from PubSub import *
 class SpoonsServer:
     #loop: asyncio.AbstractEventLoop)
-    def __init__(self, game_name, expected_players:
+    def __init__(self, game_name, expected_players):
         self.master = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.name_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.port = 9000
@@ -42,7 +42,7 @@ class SpoonsServer:
             except:
                 self.port += 1
         
-       '''
+       
         
         
         if(self.master.listen(5) == -1):
@@ -154,7 +154,7 @@ class SpoonsServer:
         asyncio.create_task(self.handle_client(player_id, writer))
         self.num_players += 1
 
-    '''
+    
     async def broadcast(self):
         while self.BroadCastQueue:
             client = self.BroadCastQueue.pop(0)
@@ -373,13 +373,15 @@ class SpoonsServer:
                     self.BroadCastQueue.append(players_info[p])
                     #asyncio.run(tcp_echo_client('GRAB SPOON!'))
                     # need to broadcast at once.... '
-            await self.broadcast()
+            #await self.broadcast()
+            print("BROADCAST HERE")
         #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
             
             # now we will go through ready sockets and recv messages for grabbing
             # this will recieve the message and then order the spoon grabs by time
             # then we will know who is eliminated
             #self.play_game()
+            '''
             while(self.num_spoons>0):
                 ready, _, _ = select.select(self.BroadCastQueue, [], [])
                 self.broadcast_ready = ready
@@ -455,7 +457,7 @@ class SpoonsServer:
             # go to next round
             self.num_players -=1
             self.start_next_round()
-
+        '''
     # move onto the next round with eliminated player removed, one less spoon, new shuffled hands
     def start_next_round(self):
         # what we need reset at beginning of each new round
