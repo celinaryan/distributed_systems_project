@@ -15,10 +15,9 @@ class SpoonsServer:
         self.game_name = game_name
         self.last_sent = 0
         self.BroadCastQueue = []
-        # self.multicast_group = ('224.3.29.71', 10000)
-        # self.multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #self.multicast_sock.settimeout(0.2)
-        # self.multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, (b'1'))
+        self.multicast_group = ('224.3.29.71', 10000)
+        self.multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, (b'1'))
 
         
         self.players = []
@@ -46,7 +45,7 @@ class SpoonsServer:
         print('Listening on port ' + str(self.master.getsockname()[1]))
         self.port = self.master.getsockname()[1]
         self.game_init_time = time.time_ns()
-        self.game_over = 0
+        self.round_over = 0
 
         # will continue playing games until server is killed
         while True:
@@ -91,7 +90,7 @@ class SpoonsServer:
         # Set pickup pile of player #0 to be remaining_cards in deck object
         self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
     
-        while self.game_over == 0:
+        while self.round_over == 0:
             if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
                 self.send_udp()
                 self.last_sent = time.time_ns()
@@ -168,6 +167,7 @@ class SpoonsServer:
         # TODO: handle get_cards, pickup, putdown, and spoon requests from clients
         if method == 'get_cards':
             resp = { 'method': 'get_cards', 'result': 'success', 'cards': self.players_info[player]['cards'] }
+            return resp
 
         elif method == 'pickup':
             if self.first_spoon_grabbed:
@@ -190,6 +190,7 @@ class SpoonsServer:
             new_card = self.players_info[player]['pickup_deck'].pop()
             self.players_info[player]['cards'].append(new_card)
             resp = { 'method': 'pickup', 'result': 'success', 'card': new_card }
+            return resp
 
         elif method == 'discard':
             if self.first_spoon_grabbed:
@@ -206,55 +207,86 @@ class SpoonsServer:
                 self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
 
             resp = { 'method': 'discard', 'result': 'success' }
+            return resp
 
-        elif method == 'grab_spoon':  
+        elif method == 'grab_spoon': 
+            self.spoon_multicast() 
+
+            for p in self.players_info:
+                if p['player_num'] in moving_forward:
+                    resp = {'result': 'next_round'}
+                    self.num_spoons -= 1
+                else:
+                    resp = { 'result': 'eliminated' }
+                    self.num_players -= 1
+
+            self.round_over = 1
+            #self.reset()
+            return resp
 
             # first spoon to be grabbed
-            if self.first_spoon_grabbed == 0:
-                self.first_spoon_grabbed = 1
-                self.num_spoons -= 1
-                resp = {'result': 'next_round'}
+            # if self.first_spoon_grabbed == 0:
+            #     self.first_spoon_grabbed = 1
+            #     self.num_spoons -= 1
+            #     resp = {'result': 'next_round'}
+            #     return resp
 
-            elif self.num_spoons > 0:
-                self.num_spoons -= 1
-                resp = {'result': 'next_round'}
+            # elif self.num_spoons > 0:
+            #     self.num_spoons -= 1
+            #     resp = {'result': 'next_round'}
+            #     return resp
 
-            # remove last to grab
-            elif self.num_spoons == 0:
-                self.num_players -= 1
-                resp = { 'result': 'eliminated' }
-
-        return resp
-
-
-    # def spoon_multicast(self):
-    #     self.multicast_sock.settimeout(5)
-
-    #     # send msg to the multicast group
-    #     print('1 here')
-    #     msg = json.dumps({ 'msg': 'SPOON_GRABBED! YOU HAVE 10 SECONDS TO TRY AND GRAB A SPOON!' }).encode()
-        
-    #     #try:
-    #     #result = self.multicast_sock.sendto(msg, self.multicast_group)
-    #     self.timeSpoonGrabbed = time.time_ns()
-    #     print('2 here')
-    #     # wait for responses from all players for 10s
-    #     while time.time_ns() - self.timeSpoonGrabbed < 10e+9:
-    #         result = self.multicast_sock.sendto(msg, self.multicast_group)
-
-    #         print('3 here', result)
-    #         try: 
-    #             data, p = self.multicast_sock.recvfrom(1024)
-    #             print('4 here')
-    #             self.moving_forward.append(p)
-    #             self.players_info[p].spoon_grabbed = 1
-    #             print('received', data, 'from', p)
-
-    #         except socket.timeout:
-    #             print('too slow')
+            # # remove last to grab
+            # elif self.num_spoons == 0:
+            #     self.num_players -= 1
+            #     resp = { 'result': 'eliminated' }
+            #     return resp
 
 
-        # # notify eliminated players
+    def spoon_multicast(self):
+        self.multicast_sock.settimeout(10)
+
+        try:
+            # send msg to the multicast group
+            msg = json.dumps({ 'msg': 'SPOON_GRABBED! YOU HAVE 10 SECONDS TO TRY AND GRAB A SPOON!' }).encode()
+            
+            print('sending', msg)
+
+            result = self.multicast_sock.sendto(msg, self.multicast_group)
+
+            while True:
+                try:
+                    # data will be player_num
+                    data, addr = self.multicast_sock.recvfrom(1024)
+                except socket.timeout:
+                    print('timed out no more responses')
+                    break
+                else:
+                    print('received', data.decode(), 'from', addr)
+                    self.moving_forward.append(data)
+        finally:
+            print('closing socket')
+
+
+        #self.timeSpoonGrabbed = time.time_ns()
+        # print('2 here')
+        # # wait for responses from all players for 10s
+        # while time.time_ns() - self.timeSpoonGrabbed < 10e+9:
+        #     result = self.multicast_sock.sendto(msg, self.multicast_group)
+
+        #     print('3 here', result)
+        #     try: 
+        #         data, p = self.multicast_sock.recvfrom(1024)
+        #         print('4 here')
+        #         self.moving_forward.append(p)
+        #         self.players_info[p].spoon_grabbed = 1
+        #         print('received', data, 'from', p)
+
+        #     except socket.timeout:
+        #         print('too slow')
+
+
+        # notify eliminated players
         # for p in self.players:
         #     if p not in self.moving_forward:
         #         msg = json.dumps('ELIMINATED').encode()
@@ -266,24 +298,28 @@ class SpoonsServer:
         #         p.send(msg)
 
 
-        ### ? how to handle failure?
+        ## ? how to handle failure?
         # except Exception as e:
         #     print("FAILED", e)
 
-    def spoons_thread(self, player, msg):
-        if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
-            self.timeSpoonGrabbed = int(msg['time'])
-            self.num_spoons -= 1
-            ack_msg = {'method': "grab_spoon", 'status': 'success','spoons_left': str(num_spoons)}
-            response = json.dumps(response)
-            player.send(response.encode())
-            self.players_info[player]['spoon_grabbed'] = 1
-            broadcast_msg = {'method': 'grab_spoon', 'spoons_left': str(num_spoons)}
-            for p in players_info:
-                if players_info[p]['spoon_grabbed'] == 0:
-                    self.BroadCastQueue.append(players_info[p])
-                    # need to broadcast at once.... 
-        #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
+
+
+
+
+    # def spoons_thread(self, player, msg):
+    #     if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
+    #         self.timeSpoonGrabbed = int(msg['time'])
+    #         self.num_spoons -= 1
+    #         ack_msg = {'method': "grab_spoon", 'status': 'success','spoons_left': str(num_spoons)}
+    #         response = json.dumps(response)
+    #         player.send(response.encode())
+    #         self.players_info[player]['spoon_grabbed'] = 1
+    #         broadcast_msg = {'method': 'grab_spoon', 'spoons_left': str(num_spoons)}
+    #         for p in players_info:
+    #             if players_info[p]['spoon_grabbed'] == 0:
+    #                 self.BroadCastQueue.append(players_info[p])
+    #                 # need to broadcast at once.... 
+    #     #else: # otherwise its a race condition.. might want to lock this section and make it in a thread..
             
 
   

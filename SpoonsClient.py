@@ -25,16 +25,14 @@ class SpoonsClient:
         self.id = -1
         self.grabbing_started = 0
         self.eliminated = 0
-        # self.multicast_group = '224.3.29.71'
-        # self.spoon_server_address = ('', 10000)
-        # self.spoon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.multicast_group = '224.3.29.71'
+        self.spoon_server_address = ('', 10000)
+        self.spoon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.mycards = []
         
         # lookup name and connect to server
         self.connect_to_server()
-        while(not self.eliminated):
-            self.play_game()
 
     def find_name(self):
         while(True):
@@ -100,13 +98,6 @@ class SpoonsClient:
         # server will send hand of cards
         self.get_cards()
 
-        # join UDP multicast group for spoon grab messages
-        # self.spoon_sock.bind(self.spoon_server_address)
-        # group = socket.inet_aton(self.multicast_group)
-        # mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-        # self.spoon_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-
         while(self.grabbing_started == 0):
         
             print('\nYOUR HAND:')
@@ -170,12 +161,28 @@ class SpoonsClient:
     #             method = input('ENTER x TO TRY TO GRAB A SPOON!\n')
     #             self.spoon_sock.sendto('ack', addr)
 
+    def monitor_spoons(self):
+        # join UDP multicast group for spoon grab messages
+        self.spoon_sock.bind(self.spoon_server_address)
+        group = socket.inet_aton(self.multicast_group)
+        mreq = struct.pack('4sL', group, socket.INADDR_ANY)
+        self.spoon_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
+        while True:
+            print('waiting to receive spoon message')
+            data, address = self.spoon_sock.recvfrom(1024)
+
+            print('received', json.loads(data.decode()), 'from', address)
+
+            print('sending acknowledgement to', address)
+            sock.sendto(self.player_num.encode(), address)
+
+
     def grab_spoon(self):
         # print("Are you ready to grab a spoon?")
         # wantSpoon = input("PRESS x TO GRAB SPOON!")
         # user gets correct card line up and grabs spoon
         # if wantSpoon == 'x\n':
-
 
         if self.four_of_a_kind() or self.grabbing_started:
             msg = { 'method': 'grab_spoon'}
