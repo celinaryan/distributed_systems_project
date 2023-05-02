@@ -37,17 +37,20 @@ class SpoonsServer:
         self.timeSpoonGrabbed    = -1
         self.first_spoon_grabbed = 0
         self.moving_forward      = []
+    
+    async def run(self):
         # Start the name server and "master" server
-        asyncio.ensure_future(self.init_server())
-        asyncio.ensure_future(self.init_name_server())
-        
+        await self.init_name_server()
+        await self.init_server()
+         
     async def init_server(self):
         '''
         Inits the server
+        TODO: Change ip and port to whatever you want
         '''
         self.game_init_time = time.time_ns()
         self.game_over = 0
-        server = await asyncio.start_server(self.handle_client, ip, port)
+        server = await asyncio.start_server(self.handle_client, '0.0.0.0', self.port)
         async with server:
             await server.serve_forever()
 
@@ -60,7 +63,6 @@ class SpoonsServer:
                 1. Send a reject message to client saying a game is already in session
                 2. Start another game w/ new set of clients (possible since game is running asynchronously)
         '''
-        
         client_addr   = writer.get_extra_info["peername"]
         client_fileno = writer.get_extra_info["socket"].fileno()
 
@@ -68,9 +70,6 @@ class SpoonsServer:
         data = reader.read(1024)
         msg  = data.decode("utf-8")
         await self.execute_msg(client_fileno, client_addr, writer, msg)
-
-    
-
         await writer.wait_closed()
 
     async def init_name_server(self):
@@ -383,7 +382,8 @@ class SpoonsServer:
         self.transport.sendto(json.dumps(msg).encode())
         self.last_sent = time.time_ns()
 
-if __name__ == '__main__':
+        
+async def main():
     if len(sys.argv) != 3:
         print('Invalid number of arguments')
         print('Usage: python3 SpoonsServer.py <GAME_NAME> <NUM_PLAYERS>')
@@ -396,11 +396,9 @@ if __name__ == '__main__':
         print('Need at least 2 players')
         exit(1)
 
-    #ss = SpoonsServer(game_name, num_players)
-
-    # *******************
-    #loop = asyncio.get_event_loop()
     ss = SpoonsServer(game_name, num_players)
-    # *******************
-    #server = Server(sys.argv[1], sys.argv[2], loop)
-    #ss.start_server()
+    await ss.run()
+    
+
+if __name__ == '__main__':
+    asyncio.run(main())
