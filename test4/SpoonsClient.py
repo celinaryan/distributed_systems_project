@@ -8,7 +8,7 @@ from functools import partial
 from concurrent.futures.thread import ThreadPoolExecutor
 
 # hard coded server address for now
-SERVER = '0.0.0.0'
+#SERVER = '0.0.0.0'
 class SpoonsClient:
     heart = "\u2665"
     club = "\u2663"
@@ -101,13 +101,13 @@ class SpoonsClient:
             for entry in name_server_entries:
                 try:
                     if self.host == None and entry['game_name'] == self.game_name: # save the first match
-                        self.host = SERVER
+                        self.host =  entry['host']
                         self.port = entry['port']
                         self.lastheardfrom = entry['lastheardfrom']
 
                     elif entry['game_name'] == self.game_name:   # if exist more matches --> check lastheardfrom
                         if entry['lastheardfrom'] > self.lastheardfrom:
-                            self.host = SERVER
+                            self.host =  entry['host']
                             self.port = entry['port']
                             self.lastheardfrom = entry['lastheardfrom']
                     

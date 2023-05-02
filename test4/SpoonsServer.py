@@ -23,6 +23,7 @@ class SpoonsServer:
     def __init__(self, game_name, expected_players):
         self.port                = 9000
         self.game_name           = game_name
+        self.host                = ''
         self.last_sent           = 0
         # TODO: Spoon count was never set?
         self.spoons              = 3
@@ -64,7 +65,12 @@ class SpoonsServer:
         '''
         self.game_init_time = time.time_ns()
         self.game_over = 0
-        server = await asyncio.start_server(self.handle_client, '0.0.0.0', self.port)
+        self.host = '0.0.0.0'
+        for i in range(15):
+            try:
+                server = await asyncio.start_server(self.handle_client, self.host, self.port)
+            except:
+                self.port+=1
         async with server:
             await server.serve_forever()
 
@@ -105,23 +111,12 @@ class SpoonsServer:
         await self.play_game()
 
     async def play_game(self):
-    
         while self.game_over == 0:
-            if self.last_sent == 0 or time.time_ns() - self.last_sent > 6e+10:
-                # Run this in the background so it doesn't get in the way of the game
-                asyncio.ensure_future(self.send_udp())
-            
             # either recieving message for picking up cards or spoons
             if self.first_spoon_grabbed == 0:
                 ready, _, _ = select.select(self.players, [], [])
                 random.shuffle(ready)   ### ??? make service more fair? is there a way to order them in the order the messages were recv'ed?
                                         # yes I think that's good
-            else: # means we're in server thread
-
-                # Don't need to do this with select
-                self.broadcast("SPOON WAS GRABBED!! GRAB SPOON ASAP!")
-                ready, _, _ = select.select(self.BroadCastQueue, [], [])
-                self.broadcast_ready = ready
                 
             # Don't need to do this with asyncio
             for player in ready:
@@ -203,7 +198,7 @@ class SpoonsServer:
 
             # If there is an expected # of players, start running the game in the background
             self.num_players += 1
-            if self.num_players  > self.expected_players:
+            if self.num_players  < self.expected_players:
                 asyncio.ensure_future(self.init_game())
 
         if method == 'get_cards':
@@ -253,8 +248,8 @@ class SpoonsServer:
         writer.write(json.dumps(resp).encode())
         await writer.drain()
 
-    async def send_msg(self, player, msg):
-        ...
+    #async def send_msg(self, player, msg):
+    #    ...
             
     async def spoons_thread(self, player, msg):
         # first spoon is grabbed
@@ -397,7 +392,7 @@ class SpoonsServer:
         Sends a UDP message to the name server
         '''
         print("sending to name server")
-        msg = { "type" : "hashtable", "owner" : "mnovak5", "port" : self.port, "game_name" : self.game_name }
+        msg = { "type" : "hashtable", "owner" : "mnovak5", "port" : self.port, "game_name" : self.game_name, "host": self.host }
         self.transport.sendto(json.dumps(msg).encode())
         self.last_sent = time.time_ns()
 
