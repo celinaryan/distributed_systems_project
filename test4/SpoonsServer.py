@@ -77,12 +77,16 @@ class SpoonsServer:
                 1. Send a reject message to client saying a game is already in session
                 2. Start another game w/ new set of clients (possible since game is running asynchronously)
         '''
-        client_addr   = writer.get_extra_info["peername"]
-        client_fileno = writer.get_extra_info["socket"].fileno()
+        client_addr   = writer.get_extra_info("peername")
+        client_fileno = writer.get_extra_info("socket").fileno()
 
         # Change byte amount however you set it up
-        data = reader.read(1024)
+        bytes_to_read = await reader.read(2)
+        bytes_to_read = int.from_bytes(bytes_to_read, byteorder="big")
+        print(f"Reading {bytes_to_read} bytes from client {client_fileno}")
+        data = await reader.read(bytes_to_read)
         msg  = data.decode("utf-8")
+        print(f"Got message from client: {msg}")
         await self.execute_msg(client_fileno, client_addr, writer, msg)
         await writer.wait_closed()
 
@@ -188,6 +192,7 @@ class SpoonsServer:
         method = msg['method']
         # TODO: handle get_cards, pickup, putdown, and spoon requests from clients
         if method == "join_game":
+            print('got join_game')
             # Handle if game already started...
             print(f"New Player: {player}, Address: {player_addr}")
             self.init_player_info(player, self.num_players, writer)
@@ -214,14 +219,12 @@ class SpoonsServer:
                 if player == self.players[0]:
                     if self.discard_pile == []:
                         resp = { 'method': 'pickup', 'result': 'failure', 'message': 'No cards in pickup deck. Try again.' }
-                        return resp
                     else:
                         self.players_info[player]['pickup_deck'] = self.discard_pile
                         self.discard_pile = []
 
                 else:
                     resp = { 'method': 'pickup', 'result': 'failure', 'message': 'No cards in pickup deck. Try again.' }
-                    return resp
 
             new_card = self.players_info[player]['pickup_deck'].pop()
             self.players_info[player]['cards'].append(new_card)
@@ -242,12 +245,14 @@ class SpoonsServer:
                 self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
 
             resp = { 'method': 'discard', 'result': 'success' }
-            return resp
             
         elif method == 'grab_spoon':  
             # first spoon to be grabbed, enter spoon_thread for broadcast and grabbing spoon event
             if self.first_spoon_grabbed == 0:
                 self.spoons_thread(self.players_info[player],msg)
+        print(f"Resp: {resp}")
+        writer.write(resp.encode())
+        writer.drain()
 
     async def send_msg(self, player, msg):
         ...

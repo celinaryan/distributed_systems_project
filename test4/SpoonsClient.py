@@ -3,8 +3,6 @@ import socket
 import json
 import http.client
 import time
-import struct 
-import select
 import asyncio
 from functools import partial
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -19,7 +17,6 @@ class SpoonsClient:
 
     def __init__(self, game_name):
         self.game_name = game_name
-        #self.player_name = player_name
         self.host = None
         self.port = 0
         self.lastheardfrom = 0
@@ -30,12 +27,8 @@ class SpoonsClient:
         self.id = -1
         self.grabbing_started = 0
         self.eliminated = 0
-        #self.PUBSUB = PubSub()
         self.reader = None
         self.writer = None
-        # self.multicast_group = '224.3.29.71'
-        # self.spoon_server_address = ('', 10000)
-        # self.spoon_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.mycards = []
         
@@ -95,10 +88,12 @@ class SpoonsClient:
     '''
     
     def find_name(self):
+        print('finding name')
         while(True):
             name_server = http.client.HTTPConnection('catalog.cse.nd.edu', '9097')
             name_server.request('GET', '/query.json')
             name_server_entries = json.loads(name_server.getresponse().read().decode())
+            print("Got entry from name server")
 
             for entry in name_server_entries:
                 try:
@@ -130,6 +125,7 @@ class SpoonsClient:
 
         self.s.settimeout(30)
         self.find_name()
+        print("got name")
 
         self.server_retries = 0
         while(True):
@@ -137,6 +133,7 @@ class SpoonsClient:
                 res = self.s.connect((self.host, self.port))
                 msg = { 'method': 'join_game' }
                 msg = json.dumps(msg)
+                print("connected to server")
                 self.send_request(msg)
                 resp = self.recv_resp(msg)
                 #if resp['status'] == 'success':
