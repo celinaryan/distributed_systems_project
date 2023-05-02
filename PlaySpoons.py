@@ -11,9 +11,9 @@ async def main():
         game_name = sys.argv[1]
 
     player = SpoonsClient(game_name)
-    #while(eliminated):
+    #while(not eliminated):
     
-    await asyncio.gather(player.play_game(), player.spoon_multicast())
+    await asyncio.gather(player.play_game(), player.monitor_spoons())
 
 if __name__=='__main__':
     asyncio.run(main())
