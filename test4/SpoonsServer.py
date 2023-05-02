@@ -16,6 +16,7 @@ class SimpleUDPProtocol(asyncio.DatagramProtocol):
         text = data.decode("utf-8").strip()
         # May want to error check this
         response = json.loads(text)
+        # Name server doesnt send anything back, shouldnt get anything here lol
         print(f"Received from Name Server: {response}")
 
 class SpoonsServer:
@@ -39,9 +40,22 @@ class SpoonsServer:
         self.moving_forward      = []
     
     async def run(self):
-        # Start the name server and "master" server
+        '''
+        Initilizes the master socket and name server socket
+        '''
         await self.init_name_server()
+        self.schedule_udp()
         await self.init_server()
+    
+    def schedule_udp(self):
+        '''
+        Sends a UDP message to the name server every 60 seconds
+        TODO: Change the time amount to whatever
+        '''
+        num_sec = 60
+        asyncio.ensure_future(self.send_udp())
+        loop = asyncio.get_event_loop()
+        loop.call_later(num_sec, self.schedule_udp)
          
     async def init_server(self):
         '''
@@ -378,6 +392,7 @@ class SpoonsServer:
         '''
         Sends a UDP message to the name server
         '''
+        print("sending to name server")
         msg = { "type" : "hashtable", "owner" : "mnovak5", "port" : self.port, "game_name" : self.game_name }
         self.transport.sendto(json.dumps(msg).encode())
         self.last_sent = time.time_ns()
