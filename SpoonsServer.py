@@ -181,11 +181,9 @@ class SpoonsServer:
 
                 if player == self.players[0]:
                     if self.discard_pile == []:
-                        resp = { 'method': 'pickup', 'result': 'failure', 'message': 'No cards in pickup deck. Try again.' }
-                        return resp
-                    else:
                         self.players_info[player]['pickup_deck'] = self.discard_pile
                         self.discard_pile = []
+                        
 
                 else:
                     resp = { 'method': 'pickup', 'result': 'failure', 'message': 'No cards in pickup deck. Try again.' }
@@ -243,7 +241,6 @@ class SpoonsServer:
             while True:
                 try:
                     # data will be player_num
-                    print(self.multicast_sock)
                     data, addr = self.multicast_sock.recvfrom(1024)
                 except socket.timeout:
                     print('timed out no more responses')

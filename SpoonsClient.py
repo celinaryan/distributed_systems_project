@@ -172,7 +172,6 @@ class SpoonsClient:
             msg = json.dumps(msg)
             self.send_request(msg)
 
-            print(self.spoon_sock)
             self.monitor_spoons()
 
             resp = self.recv_resp(msg)
