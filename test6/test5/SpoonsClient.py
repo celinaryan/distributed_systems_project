@@ -109,33 +109,32 @@ class SpoonsClient:
 			#     time.sleep(2**self.server_retries)
 			#     self.server_retries+=1
 		
-	async def get_user_input(self):
-		return await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
-
+	
 
 	async def play_game(self):
 		print(f"Starting game..")
 		await self.get_cards()
-		#get_input = partial(asyncio.get_event_loop().run_in_executor, ThreadPoolExecutor(1))
 		spoon_listen = partial(asyncio.get_event_loop().run_in_executor, ThreadPoolExecutor(1))
 
-		while(self.grabbing_started == 0):
-
+		while self.grabbing_started == 0:
 			print('\nYOUR HAND:')
 			self.display_cards(self.mycards, 1)
 
-			#spoon_listen = asyncio.ensure_future(self.wait_on_broadcast())
-			spoon_notif = await spoon_listen(self.wait_on_broadcast)
-			#get_input = asyncio.get_event_loop().run_in_executor(ThreadPoolExecutor(1), input, "Enter 'p' to pickup next card\nEnter 'x' to try to grab a spoon\n")
-			method = await asyncio.open_stdin().readline()
-			method = method.strip()
+			# wait for both user input and spoon notification using task list and wait
+			tasks = [asyncio.wait([spoon_listen(self.wait_on_broadcast())])]
+			done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+			# check for spoon notification in completed tasks
+			##NEED TO CHANGE THIS TO HANDLE PROPER SERVER RESPONSE
+			if done:
+				spoon_notif = done.pop().result()
 				
+				if spoon_notif[0] == 'GRAB':
+					print('grab a spoon')
+					await self.grab_spoon()
+					continue
 
-			#spoon_notif = await self.listen()
-			#print('NOTIF:',spoon_notif)
-			#spoon_notif = await spoon_listen(self.wait_on_broadcast())
-			#if not spoon_notif:
-
+			method = input("Enter 'p' to pickup next card\nEnter 'x' to try to grab a spoon\n")
 
 			if method != 'p' and method != 'x':
 				print('Invalid operation')
@@ -148,8 +147,7 @@ class SpoonsClient:
 					return
 				elif new_card == 'eliminated':
 					return
-
-				elif new_card == None:
+				elif new_card is None:
 					print('No cards in pick up deck yet. Try again.')
 					continue
 				self.mycards.append(new_card)
@@ -160,11 +158,11 @@ class SpoonsClient:
 					print(str(i) + ': ', end='')
 					self.display_cards([card], 0)
 
-				ind = await get_input(input, "\tEnter card to discard (0-4): ")
+				ind = input("\tEnter card to discard (0-4): ")
 
 				while ind not in ['0', '1', '2', '3', '4']:
 					print('\tInvalid card selected.')
-					ind = await get_input(input, "\tEnter card to discard (0-4): ")
+					ind = input("\tEnter card to discard (0-4): ")
 				ind = int(ind)
 				discard_card = self.mycards[ind]
 				resp = await self.discard(discard_card)
@@ -172,8 +170,8 @@ class SpoonsClient:
 					return
 				self.mycards.remove(discard_card)
 			sys.stdout.flush()
-		#else:
-			#await self.grab_spoon()
+		else:
+			await self.grab_spoon()
 
 	
 	async def wait_on_broadcast(self):
