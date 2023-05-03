@@ -167,6 +167,8 @@ class SpoonsServer:
                 self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
 
             resp = { 'result': 'success' }
+        else:
+            print('HERE HERE', method)
 
         return resp
 
@@ -189,8 +191,6 @@ class SpoonsServer:
             self.last_sent = time.time_ns()
             msg = { "type" : "hashtable", "owner" : "mnovak5", "port" : self.port, "game_name" : self.game_name }
             result = name_server.sendto(json.dumps(msg).encode(), (socket.gethostbyname('catalog.cse.nd.edu'), 9097))
-
-        print('port:', self.port)
 
         name_server.close()
 
