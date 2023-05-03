@@ -116,7 +116,14 @@ class SpoonsServer:
 		for player in self.players_info:
 			tasks.append(self.send_msg(player, msg))
 		await asyncio.gather(*tasks)
-		
+
+		self.deal_cards()
+		self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
+
+		###### TAKE OUT AFTER DEBUGGING ######
+		#self.players_info[self.players[0]]['cards'] = ['4H', '4D', '4S', '4C']
+		######################################
+
 		# Set pickup pile of player #0 to be remaining_cards in deck object
 		self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
 		# await self.play_game()
@@ -142,8 +149,8 @@ class SpoonsServer:
 			msg = json.loads(msg)
 		except:
 			print(type(msg))
-		method = msg['method']
 		print(f"Got message from client: {msg}")
+		method = msg['method']
 
 		if method == "join_game":
 			# Handle if game already started...
@@ -199,20 +206,24 @@ class SpoonsServer:
 			# else into next player's pickup deck
 			else:
 				self.players_info[self.players[next_ind]]['pickup_deck'].append(msg['card'])
-
+				print('adding to player', next_ind, 'pile')
 			resp = { 'method': 'discard', 'result': 'success' }
 			
 		elif method == 'grab_spoon':  
 			# first spoon to be grabbed, enter spoon_thread for broadcast and grabbing spoon event
 			if self.first_spoon_grabbed == 0:
-				self.spoons_thread(self.players_info[player],msg)
+				await self.spoons_thread(self.players_info[player],msg)
+		
 		writer.write(json.dumps(resp).encode())
 		await writer.drain()
 
 			
 	async def spoons_thread(self, player, msg):
 		# first spoon is grabbed
+		print('BEFORE PLAYERS:', self.players_info)
+		print(self.num_spoons, self.num_players - 1)
 		if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
+			print('ENTERED1')
 			self.time_spoon_grabbed = float(msg["time"])
 			self.num_spoons -= 1
 			self.players_info[player]["spoon_grabbed"] = 1
@@ -234,6 +245,7 @@ class SpoonsServer:
 		
 		# Not first spoon but still spoons left
 		elif self.num_spoons > 0:
+			print('ENTERED2')
 			self.num_spoons -= 1
 			self.players_info[player]["spoon_grabbed"] = 1
 			self.players_info[player]["grab_time_stamp"] = float(msg["time"])
@@ -242,15 +254,12 @@ class SpoonsServer:
 			await self.send_msg(player, response)
 		# No spoons left, player is eliminated
 		else:
-			# Remove player from game
-			self.num_of_players -= 1
-			self.players.remove(player)
-			self.players_info.pop(player)
+			print('ENTERED3')
 
 			# send message to player that they are eliminated and that new round is starting
 			ack_msg = {'method': "grab_spoon", 'status': 'failure', 'message': 'You are eliminated!'}
 			response = json.dumps(ack_msg)
-			await self.send_msg(player, response)
+			await self.send_msg(player['writer'].get_extra_info("socket").fileno(), response)
 
 			# Send message to all other players that new round is starting
 			ack_msg = {'method': "new_round", 'result': 'new_round', 'message': 'New round starting!'}
@@ -260,11 +269,22 @@ class SpoonsServer:
 				tasks.append(self.send_msg(p, msg))
 			await asyncio.gather(*tasks)
 			# start new round
+
+			# Remove player from game
+			self.num_players -= 1
+			self.players.remove(player['writer'].get_extra_info("socket").fileno())
+			self.players_info.pop(player['writer'].get_extra_info("socket").fileno())
+
 			self.start_next_round()
 			
 
 	async def send_msg(self, player, msg):
+		print('\n\nPLAYERS INFO:::', self.players_info)
+		print('\n\nPLAYER :::', player)
 		writer = self.players_info[player]["writer"]
+
+		#writer.get_extra_info("socket").fileno()
+
 		writer.write(msg.encode())
 		await writer.drain()
 
@@ -278,7 +298,7 @@ class SpoonsServer:
 		self.timeSpoonGrabbed = -1
 		self.first_spoon_grabbed = 0
 		self.remaining_cards = []
-		self.deal_cards()
+		#self.deal_cards()
 		self.first_spoon_grabbed = 0
 		self.num_spoons = self.num_players - 1
 

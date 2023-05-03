@@ -42,12 +42,12 @@ class SpoonsClient:
 			
 
 	def find_name(self):
-		print('finding name')
+		#'finding name')
 		while (True):
 			name_server = http.client.HTTPConnection('catalog.cse.nd.edu', '9097')
 			name_server.request('GET', '/query.json')
 			name_server_entries = json.loads(name_server.getresponse().read().decode())
-			print("Got entry from name server")
+			#print("Got entry from name server")
 
 			for entry in name_server_entries:
 				try:
@@ -76,19 +76,19 @@ class SpoonsClient:
 	async def connect_to_server(self):
 		#TODO: Set timeout
 		self.find_name()
-		print(f"Found name: {self.game_name} at {self.host}:{self.port}")
+		#print(f"Found name: {self.game_name} at {self.host}:{self.port}")
 
 		self.server_retries = 0
 		# while True:
 		#     try:
 		self.reader, self.writer = await asyncio.open_connection(self.host, int(self.port))
-		print("connected to server")
+		#print("connected to server")
 		msg = {'method': 'join_game'}
 		msg = json.dumps(msg)
 		await self.send_request(msg)
 		resp = await self.recv_resp(msg)
 		self.id = int(resp['id'])
-		print('Connected to port: ', self.port)
+		#print('Connected to port: ', self.port)
 		print('Welcome! You are player ' + str(self.id) + '!')
 		if self.id == 0:
 			print('\nYou are the first player in the circle! You will be picking up from the remaining deck and will begin the flow of cards.')
@@ -115,7 +115,6 @@ class SpoonsClient:
 				print('Invalid operation')
 				continue
 			if method == 'x':
-				print('GRABBING SPOON')
 				await self.grab_spoon()
 			if method == 'p':
 				new_card = await self.pickup()
@@ -135,50 +134,53 @@ class SpoonsClient:
 					print(str(i) + ': ', end='')
 					self.display_cards([card], 0)
 
-				ind = input("\tEnter card to discard (0-4): ")
+				ind = await get_input(input, "\tEnter card to discard (0-4): ")
 
 				while ind not in ['0', '1', '2', '3', '4']:
 					print('\tInvalid card selected.')
-					ind = input("\tEnter card to discard (0-4)")
+					ind = await get_input(input, "\tEnter card to discard (0-4): ")
 				ind = int(ind)
 				discard_card = self.mycards[ind]
-				resp = self.discard(discard_card)
+				resp = await self.discard(discard_card)
 				if resp == 'next_round' or resp == 'eliminated':
 					return
 				self.mycards.remove(discard_card)
 			sys.stdout.flush()
 		else:
-			self.grab_spoon()
+			await self.grab_spoon()
 
 
 	async def grab_spoon(self):
 		print("Are you ready to grab a spoon?")
-		wantSpoon = input("PRESS x TO GRAB SPOON!")
+		wantSpoon = input("ENTER x TO GRAB SPOON! ")
 		# user gets correct card line up and grabs spoon
-		if wantSpoon == 'x\n':
+		if wantSpoon.strip() == 'x':
 			# first person to grab spoon
 			if self.four_of_a_kind() and self.grabbing_started == 0:
-				time = time.time_ns()
-				msg = { 'method': 'grab_spoon','time': str(time)}
+				self.grabbing_started = 1
+				t = time.time_ns()
+				msg = { 'method': 'grab_spoon','time': str(t)}
 				msg = json.dumps(msg)
-				self.send_request(msg)
-				server_ack = json.loads(msg)
-				status = server_ack['status']
+				await self.send_request(msg)
+
+				resp = await self.recv_resp(msg)
+				status = resp['status']
 				if status == 'success':
 					if server_ack['spoons_left'] == 0:
 						print("You got the last spoon. You win!!")
 					else:
 						print("You successfully grabbed a spoon!\nWait for the other players to grab the spoons for the next round.")
-			elif not self.four_of_a_kind and self.grabbing_started == 0:
+			elif self.four_of_a_kind() == 0 and self.grabbing_started == 0:
 				print("\nInvalid cards to grab spoon. Keep playing!")
 				return
 			elif self.grabbing_started == 1:
-				msg = { 'method': 'grab_spoon','time': str(time)}
+				msg = { 'method': 'grab_spoon','time': str(t)}
 				msg = json.dumps(msg)
-				self.send_request(msg)
+				await self.send_request(msg)
+
 				resp = await self.recv_resp(msg)
-				resp = json.dumps(resp)
-				server_ack = json.loads(resp)
+				server_ack = json.loads(resp.decode())
+
 				if server_ack['result'] == 'next_round':
 					print('SUCCESS!')
 					print('\tYou successfully grabbed a spoon. Moving on to the next round.')
@@ -190,7 +192,7 @@ class SpoonsClient:
 					return 'eliminated'
 		else:
 			# in case user doesnt press x but grabbing has begun
-			if(grabbing_started==1):
+			if(self.grabbing_started==1):
 				print("Are you sure you don't want to grab a spoon?\n")
 				self.grab_spoon()
 			else: # keep playing
@@ -223,22 +225,23 @@ class SpoonsClient:
 		msg = json.dumps(msg)
 		await self.send_request(msg)
 		resp = await self.recv_resp(msg)
-		print(f"Tried to pick up a new card, got response: {resp}")
+		#print(f"Tried to pick up a new card, got response: {resp}")
 		#if resp['method'] == 'GRAB':
 			# self.grabbing_started = 1
 			# x = input('GRABBING STARTED!\n\tENTER x TO GRAB! : ')
 			# return self.grab_spoon()
 
 		if resp['result'] == 'success':
-			print(f"Got card: {resp['card']}")
+			#print(f"Got card: {resp['card']}")
 			return resp['card']
 		else:
 			return None
 
 	async def discard(self, card):
+		print("HERE HERE")
 		msg = { 'method': 'discard', 'card': card}
 		msg = json.dumps(msg)
-		self.send_request(msg)
+		await self.send_request(msg)
 		resp = await self.recv_resp(msg)
 		#if resp['method'] == 'GRAB':
 		#    self.grabbing_started = 1
@@ -247,7 +250,7 @@ class SpoonsClient:
 		return None
   
 	async def send_request(self, msg):
-		print(f"Sending message: {msg}")
+		#print(f"Sending message: {msg}")
 		length = str(len(msg)).encode()
 		msg = msg.encode()
 		self.writer.write(length + msg)
@@ -298,16 +301,17 @@ class SpoonsClient:
 		#         break
 		data = await self.reader.read(4096)
 		resp = json.loads(data.decode())
-		print(f"Got response: {resp}")
+		#print(f"Got response: {resp}")
 		return resp
 
 	def four_of_a_kind(self):
 		if self.mycards[0][:-1] == self.mycards[1][:-1] == self.mycards[2][:-1] == self.mycards[3][:-1]:
 			return 1
+		return 0
 
 
 	def display_cards(self, cards, graphics):
-		print(f"My cards: {cards}")
+		#print(f"My cards: {cards}")
 		suits = [0,0,0,0]
 		tens = [0,0,0,0] # array of booleans saying if its a ten or not
 
