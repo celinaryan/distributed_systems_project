@@ -45,6 +45,7 @@ class SpoonsServer:
 		Initilizes the master socket and name server socket
 		'''
 		await self.init_name_server()
+		await self.init_spoon_broadcast()
 		await self.init_server()
 	
 	def schedule_udp(self):
@@ -109,6 +110,13 @@ class SpoonsServer:
 		listen = loop.create_datagram_endpoint(lambda: SimpleUDPProtocol(), remote_addr=remote_addr)
 		self.transport, self.protocol = await listen
 
+	async def init_spoon_broadcast(self):
+		loop = asyncio.get_event_loop()
+		remote_addr=('0.0.0.0', 9004)
+		listen = loop.create_datagram_endpoint(lambda: SimpleUDPProtocol(), remote_addr=remote_addr)
+		self.spoon_transport, self.spoon_protocol = await listen
+
+
 	async def init_game(self):
 		# Send a "start_game" to all users
 		tasks = []
@@ -117,6 +125,7 @@ class SpoonsServer:
 			tasks.append(self.send_msg(player, msg))
 		await asyncio.gather(*tasks)
 
+		self.num_spoons = self.num_players - 1
 		self.deal_cards()
 		self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
 
@@ -220,18 +229,30 @@ class SpoonsServer:
 			
 	async def spoons_thread(self, player, msg):
 		# first spoon is grabbed
-		print(self.num_spoons, self.num_players - 1)
+		print('HERE2')
+		print('spoons:', self.num_spoons)
+		print('players:', self.num_players)
 		if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
-			self.time_spoon_grabbed = float(msg["time"])
+			print('HERE1')
+			msg = {'method': "grab spoon"}
+			self.spoon_transport.sendto(json.dumps(msg).encode())
+			self.last_sent = time.time_ns()
+
+
+
+			# self.time_spoon_grabbed = float(msg["time"])
 			self.num_spoons -= 1
-			self.players_info[player]["spoon_grabbed"] = 1
-			self.players_info[player]["grab_time_stamp"] = self.time_spoon_grabbed
+			
+			self.players_info[player['writer'].get_extra_info("socket").fileno()]["spoon_grabbed"] = 1
+			# self.players_info[player]["grab_time_stamp"] = self.time_spoon_grabbed
 			self.first_spooned_grabbed = 1
 			ack_msg = {'method': "grab_spoon", 'status': 'success','spoons_left': self.num_spoons}
 			response = json.dumps(ack_msg)
-			self.grab_time_stamp[player] = self.time_spoon_grabbed
-			await self.send_msg(player, response)
+			#self.grab_time_stamp[player['writer'].get_extra_info("socket").fileno()] = self.time_spoon_grabbed
+			await self.send_msg(player['writer'].get_extra_info("socket").fileno(), response)
 			
+
+
 			tasks = []
 			for p in self.players_info:
 				if not self.players_info[p]["spoon_grabbed"]:
@@ -277,9 +298,6 @@ class SpoonsServer:
 		print('\n\nPLAYERS INFO:::', self.players_info)
 		print('\n\nPLAYER :::', player)
 		writer = self.players_info[player]["writer"]
-
-		#writer.get_extra_info("socket").fileno()
-
 		writer.write(msg.encode())
 		await writer.drain()
 
@@ -319,7 +337,7 @@ class SpoonsServer:
 		print("sending to name server")
 		
 		msg = { "type" : "hashtable", "owner" : "mnovak5", "host": self.host, "port" : self.port, "game_name" : self.game_name }
-		self.transport.sendto(json.dumps(msg).encode())
+		self.spoon_transport.sendto(json.dumps(msg).encode())
 		self.last_sent = time.time_ns()
 
 		

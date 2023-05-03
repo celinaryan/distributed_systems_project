@@ -39,7 +39,14 @@ class SpoonsClient:
 		if resp['method'] == 'start_game':
 			print("Game is starting")
 			await self.play_game()
-			
+
+	async def listen(self, port, ip):
+		loop = asyncio.get_event_loop()
+		remote_addr=('0.0.0.0', 9004)
+		listen = loop.create_datagram_endpoint(lambda: SimpleUDPProtocol(), remote_addr=remote_addr)
+		self.transport, self.protocol = await listen
+		asyncio.ensure_future(self.play_game())			
+
 
 	def find_name(self):
 		#'finding name')
@@ -104,12 +111,16 @@ class SpoonsClient:
 		print(f"Starting game..")
 		await self.get_cards()
 		get_input = partial(asyncio.get_event_loop().run_in_executor, ThreadPoolExecutor(1))
+		spoon_listen = partial(asyncio.get_event_loop().run_in_executor, ThreadPoolExecutor(1))
+
 		while(self.grabbing_started == 0):
 
 			print('\nYOUR HAND:')
 			self.display_cards(self.mycards, 1)
 
+			#spoon_notif = await spoon_listen()
 			method = await get_input(input, "Enter 'p' to pickup next card\nEnter 'x' to try to grab a spoon\n")
+
 
 			if method != 'p' and method != 'x':
 				print('Invalid operation')
@@ -151,8 +162,10 @@ class SpoonsClient:
 
 
 	async def grab_spoon(self):
+		get_input = partial(asyncio.get_event_loop().run_in_executor, ThreadPoolExecutor(1))
+
 		print("Are you ready to grab a spoon?")
-		wantSpoon = input("ENTER x TO GRAB SPOON! ")
+		wantSpoon = await get_input(input, "ENTER x TO GRAB SPOON! ")
 		# user gets correct card line up and grabs spoon
 		if wantSpoon.strip() == 'x':
 			# first person to grab spoon
@@ -162,11 +175,11 @@ class SpoonsClient:
 				msg = { 'method': 'grab_spoon','time': str(t)}
 				msg = json.dumps(msg)
 				await self.send_request(msg)
-
+				
 				resp = await self.recv_resp(msg)
 				status = resp['status']
 				if status == 'success':
-					if server_ack['spoons_left'] == 0:
+					if resp['spoons_left'] == 0:
 						print("You got the last spoon. You win!!")
 					else:
 						print("You successfully grabbed a spoon!\nWait for the other players to grab the spoons for the next round.")
@@ -230,7 +243,7 @@ class SpoonsClient:
 			# self.grabbing_started = 1
 			# x = input('GRABBING STARTED!\n\tENTER x TO GRAB! : ')
 			# return self.grab_spoon()
-
+				
 		if resp['result'] == 'success':
 			#print(f"Got card: {resp['card']}")
 			return resp['card']
