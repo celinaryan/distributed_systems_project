@@ -21,7 +21,7 @@ class SimpleUDPProtocol(asyncio.DatagramProtocol):
 
 class SpoonsServer:
 	def __init__(self, game_name, expected_players):
-		self.port                = 9000
+		self.port                = 9001
 		self.game_name           = game_name
 		self.last_sent           = 0
 		# TODO: Spoon count was never set?
@@ -45,7 +45,7 @@ class SpoonsServer:
 		Initilizes the master socket and name server socket
 		'''
 		await self.init_name_server()
-		await self.init_spoon_broadcast()
+		#await self.init_spoon_broadcast()
 		await self.init_server()
 	
 	def schedule_udp(self):
@@ -110,11 +110,11 @@ class SpoonsServer:
 		listen = loop.create_datagram_endpoint(lambda: SimpleUDPProtocol(), remote_addr=remote_addr)
 		self.transport, self.protocol = await listen
 
-	async def init_spoon_broadcast(self):
-		loop = asyncio.get_event_loop()
-		remote_addr=('0.0.0.0', 9004)
-		listen = loop.create_datagram_endpoint(lambda: SimpleUDPProtocol(), remote_addr=remote_addr)
-		self.spoon_transport, self.spoon_protocol = await listen
+	# async def init_spoon_broadcast(self):
+	# 	loop = asyncio.get_event_loop()
+	# 	remote_addr=('0.0.0.0', 9004)
+	# 	listen = loop.create_datagram_endpoint(lambda: SimpleUDPProtocol(), remote_addr=remote_addr)
+	# 	self.spoon_transport, self.spoon_protocol = await listen
 
 
 	async def init_game(self):
@@ -225,6 +225,7 @@ class SpoonsServer:
 		
 		writer.write(json.dumps(resp).encode())
 		await writer.drain()
+		
 
 			
 	async def spoons_thread(self, player, msg):
@@ -235,7 +236,7 @@ class SpoonsServer:
 		if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
 			print('HERE1')
 			msg = {'method': "grab spoon"}
-			self.spoon_transport.sendto(json.dumps(msg).encode())
+			#self.spoon_transport.sendto(json.dumps(msg).encode())
 			self.last_sent = time.time_ns()
 
 
@@ -337,7 +338,7 @@ class SpoonsServer:
 		print("sending to name server")
 		
 		msg = { "type" : "hashtable", "owner" : "mnovak5", "host": self.host, "port" : self.port, "game_name" : self.game_name }
-		self.spoon_transport.sendto(json.dumps(msg).encode())
+		self.transport.sendto(json.dumps(msg).encode())
 		self.last_sent = time.time_ns()
 
 		
