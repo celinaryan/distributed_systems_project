@@ -121,7 +121,7 @@ class SpoonsServer:
 		self.players_info[self.players[0]]['pickup_deck'] = self.deck.remaining_cards
 
 		###### TAKE OUT AFTER DEBUGGING ######
-		#self.players_info[self.players[0]]['cards'] = ['4H', '4D', '4S', '4C']
+		self.players_info[self.players[0]]['cards'] = ['4H', '4D', '4S', '4C']
 		######################################
 
 		# Set pickup pile of player #0 to be remaining_cards in deck object
@@ -220,10 +220,8 @@ class SpoonsServer:
 			
 	async def spoons_thread(self, player, msg):
 		# first spoon is grabbed
-		print('BEFORE PLAYERS:', self.players_info)
 		print(self.num_spoons, self.num_players - 1)
 		if self.num_spoons == self.num_players - 1: # need to broadcast to everyone else to get spoon, and that first grabber got it
-			print('ENTERED1')
 			self.time_spoon_grabbed = float(msg["time"])
 			self.num_spoons -= 1
 			self.players_info[player]["spoon_grabbed"] = 1
@@ -245,7 +243,6 @@ class SpoonsServer:
 		
 		# Not first spoon but still spoons left
 		elif self.num_spoons > 0:
-			print('ENTERED2')
 			self.num_spoons -= 1
 			self.players_info[player]["spoon_grabbed"] = 1
 			self.players_info[player]["grab_time_stamp"] = float(msg["time"])
@@ -254,8 +251,6 @@ class SpoonsServer:
 			await self.send_msg(player, response)
 		# No spoons left, player is eliminated
 		else:
-			print('ENTERED3')
-
 			# send message to player that they are eliminated and that new round is starting
 			ack_msg = {'method': "grab_spoon", 'status': 'failure', 'message': 'You are eliminated!'}
 			response = json.dumps(ack_msg)
@@ -304,8 +299,11 @@ class SpoonsServer:
 
 		print("Starting next round with ", self.num_players, "players")
 		for i, player in enumerate(self.players):
-			self.init_player_info(player, i)
-		self.init_game()
+			print('PLAYER:::', player)
+			print('PLAYERS INFO:::', self.players_info)
+			self.init_player_info(player, i, self.players_info[player]['writer'].get_extra_info("socket").fileno())
+		print("Starting next round...")
+		asyncio.ensure_future(self.init_game())
 		
 
 	def deal_cards(self):
